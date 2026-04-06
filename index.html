@@ -117,12 +117,12 @@
 
             body.innerHTML = `
   <p class="project-name">
-    <a href="${row[KEYS.project]}" target="_blank" style="text-decoration:none; color:inherit;">
+    <a href="${row[KEYS.project]}" target="_blank" class="project-link">
       ${row[KEYS.project]}
     </a>
   </p>
-  <p class="project-meta">${[row[KEYS.date], row[KEYS.location]].filter(Boolean).join(' | ')}</p>
-  ${row[KEYS.note] ? `<p class="project-note">${row[KEYS.note]}</p>` : ''}
+  <p class="project-meta">${[year, location].filter(Boolean).join(' | ')}</p>
+  ${note ? `<p class="project-note">${note}</p>` : ''}
 `;
 
             card.appendChild(body);
@@ -141,3 +141,7 @@
     </script>
   </body>
 </html>
+.project-link { text-decoration: none; color: #000000; font-weight: 700;
+border-bottom: 1px solid #cccccc; transition: all 0.3s ease; word-break:
+break-all; display: inline-block; } .project-link:hover { color: #0000ff;
+border-bottom: 1px solid #0000ff; opacity: 0.6; }
