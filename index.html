@@ -204,14 +204,16 @@
           const totalRows = rows.length;
           const estimatedHeight = Math.max(
             window.innerHeight * 2,
-            totalRows * 160,
+            totalRows * 180,
           );
           container.style.height = `${estimatedHeight}px`;
 
           for (let i = 0; i < totalRows; i++) {
             const row = rows[i];
             const colsData = row.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
-            const url = colsData[0] ? colsData[0].replace(/"/g, '').trim() : '';
+            const rawUrl = colsData[0]
+              ? colsData[0].replace(/"/g, '').trim()
+              : '';
             const tags = colsData[1]
               ? colsData[1].replace(/"/g, '').trim()
               : '';
@@ -219,13 +221,20 @@
               ? colsData[2].replace(/"/g, '').trim()
               : '';
 
-            if (url && url.startsWith('http')) {
+            if (rawUrl) {
+              const fullUrl = rawUrl.startsWith('http')
+                ? rawUrl
+                : `https://${rawUrl}`;
+              const displayUrl = rawUrl
+                .replace(/^(https?:\/\/)?(www\.)?/, '')
+                .split(/[/?#:]/)[0];
+
               const el = document.createElement('a');
-              el.href = url;
+              el.href = fullUrl;
               el.target = '_blank';
               el.className = 'archive-link';
               el.innerHTML = `
-                <span class="url-text">${url}</span>
+                <span class="url-text">${displayUrl}</span>
                 <span class="tag-text">${tags}</span>
                 <span class="desc-text">${desc}</span>
               `;
@@ -235,7 +244,7 @@
               let attempts = 0;
               let foundPosition = false;
 
-              while (attempts < 1500) {
+              while (attempts < 2000) {
                 const randomX =
                   Math.random() * (window.innerWidth - rect.width - 60);
                 const randomY =
@@ -263,10 +272,9 @@
             const loadProgress = ((i + 1) / totalRows) * 100;
             const timeElapsed = Date.now() - startTime;
             const timeProgress = (timeElapsed / minDuration) * 100;
-
             fillEl.style.width = `${Math.min(loadProgress, timeProgress)}%`;
 
-            await new Promise((resolve) => setTimeout(resolve, 20));
+            await new Promise((resolve) => setTimeout(resolve, 15));
           }
 
           const checkEnd = setInterval(() => {
