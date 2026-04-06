@@ -1,0 +1,14 @@
+{
+	"folders": [
+		{
+			"path": "../../Documents/GitHub/Archive-Archive"
+		},
+		{
+			"path": "."
+		}
+	],
+	"settings": {
+		"liveServer.settings.multiRootWorkspaceName": "SheetCMS",
+		"liveServer.settings.port": 5501
+	}
+}
