@@ -1,0 +1,13 @@
+{
+  "folders": [
+    {
+      "path": ".",
+    },
+    {
+      "path": "../../../Desktop/Archive-Archive-Rsd-main/SheetCMS",
+    },
+  ],
+  "settings": {
+    "liveServer.settings.multiRootWorkspaceName": "Archive-Archive",
+  },
+}
