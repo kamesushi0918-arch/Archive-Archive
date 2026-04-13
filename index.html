@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Archive Archive</title>
+    <title>Archive</title>
     <style>
       * {
         margin: 0;
@@ -14,7 +14,7 @@
         font-family: 'Georgia', serif;
         background: #ffffff;
         overflow: hidden;
-        text-transform: lowercase;
+        /* text-transform: lowercase; <- 강제 소문자화 속성 제거 유지 */
         user-select: none;
       }
 
@@ -56,15 +56,17 @@
         white-space: nowrap;
       }
 
+      /* top 위치를 24px에서 18px로 수정하여 살짝 위로 올림 */
       #ui-layer {
         position: fixed;
-        top: 20px;
-        left: 20px;
-        font-size: 0.9rem;
+        top: 18px;
+        left: 24px;
+        font-size: 1.3rem;
+        letter-spacing: -0.01em;
         color: #000;
         z-index: 1000;
         pointer-events: none;
-        opacity: 0.2;
+        opacity: 0.5;
       }
 
       canvas {
@@ -81,7 +83,7 @@
       </div>
     </div>
 
-    <div id="ui-layer">arrow keys or wasd: move | stay for 3s to open</div>
+    <div id="ui-layer">Arrow keys or wasd: move | stay for 3s to open</div>
 
     <script>
       const SHEET_ID = '19uD7rBe4Ic6nIR-0LJ2anEdeWTZKbR9WlcT-g8wzGx4';
@@ -104,8 +106,12 @@
       let isMoving = false;
       let isLoaded = false;
       let currentTarget = null;
+      let isInteractionPaused = false;
 
       let progressMesh, progressTex, progressCanvas, progressCtx;
+
+      const blockGeometry = new THREE.PlaneGeometry(30, 15);
+      const textureCache = {};
 
       init();
       animate();
@@ -162,6 +168,7 @@
           if (e.key in moveKeys) moveKeys[e.key] = v;
           if (e.key.toLowerCase() in moveKeys)
             moveKeys[e.key.toLowerCase()] = v;
+          if (v) isInteractionPaused = false;
         };
         window.addEventListener('keydown', (e) => keyHandler(e, true));
         window.addEventListener('keyup', (e) => keyHandler(e, false));
@@ -180,21 +187,22 @@
           const area = 4000;
 
           for (let i = 0; i < total; i++) {
-            const r = rows[i % rows.length];
+            const rowIndex = i % rows.length;
+            const r = rows[rowIndex];
             const x = (Math.random() - 0.5) * area;
             const z = (Math.random() - 0.5) * area;
 
             let skip = false;
             for (let n of archiveNodes) {
               if (
-                Math.abs(x - n.position.x) < 35 &&
-                Math.abs(z - n.position.z) < 18
+                Math.abs(x - n.position.x) < 40 &&
+                Math.abs(z - n.position.z) < 25
               ) {
                 skip = true;
                 break;
               }
             }
-            if (!skip) createBlock(r, x, z);
+            if (!skip) createBlock(r, x, z, rowIndex);
 
             if (i % 200 === 0) {
               document.getElementById('digging-fill').style.width =
@@ -213,55 +221,63 @@
         }
       }
 
-      function createBlock(row, x, z) {
+      function createBlock(row, x, z, rowIndex) {
         const c = row.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
         const url = c[0]?.replace(/"/g, '').trim();
         const cat = c[1]?.replace(/"/g, '').trim();
         const sum = c[3]?.replace(/"/g, '').trim();
         if (!url) return;
 
-        const disp = url
-          .replace(/^(https?:\/\/)?(www\.)?/, '')
-          .split(/[/?#:]/)[0]
-          .toLowerCase();
-        const canvas = document.createElement('canvas');
-        canvas.width = 1200;
-        canvas.height = 320;
-        const ctx = canvas.getContext('2d');
-        ctx.clearRect(0, 0, 1200, 320);
+        if (!textureCache[rowIndex]) {
+          const disp = url
+            .replace(/^(https?:\/\/)?(www\.)?/, '')
+            .split(/[/?#:]/)[0]
+            .toLowerCase();
 
-        ctx.font = '400 72pt Georgia';
-        ctx.fillStyle = 'black';
-        ctx.fillText(disp, 40, 100);
+          const canvas = document.createElement('canvas');
+          canvas.width = 2400;
+          canvas.height = 1200;
+          const ctx = canvas.getContext('2d');
+          ctx.clearRect(0, 0, 2400, 1200);
 
-        ctx.font = '400 40pt Georgia';
-        ctx.fillStyle = '#999999';
-        ctx.fillText(cat.toLowerCase(), 44, 170);
+          ctx.font = '400 144pt Georgia';
+          ctx.fillStyle = 'black';
+          ctx.fillText(disp, 80, 200);
 
-        ctx.font = '400 44pt Georgia';
-        ctx.fillStyle = 'black';
-        const words = (sum || '').toLowerCase().split(' ');
-        let line = '';
-        let y = 240;
-        for (let w of words) {
-          let t = line + w + ' ';
-          if (ctx.measureText(t).width > 1100 && line.length > 0) {
-            ctx.fillText(line, 44, y);
-            line = w + ' ';
-            y += 56;
-          } else {
-            line = t;
+          ctx.font = '400 80pt Georgia';
+          ctx.fillStyle = '#999999';
+          ctx.fillText(cat.toLowerCase(), 88, 340);
+
+          ctx.font = '400 88pt Georgia';
+          ctx.fillStyle = 'black';
+          const words = (sum || '').toLowerCase().split(' ');
+          let line = '';
+          let y = 480;
+          for (let w of words) {
+            let t = line + w + ' ';
+            if (ctx.measureText(t).width > 2200 && line.length > 0) {
+              ctx.fillText(line, 88, y);
+              line = w + ' ';
+              y += 112;
+            } else {
+              line = t;
+            }
           }
-        }
-        ctx.fillText(line, 44, y);
+          ctx.fillText(line, 88, y);
 
-        const tex = new THREE.CanvasTexture(canvas);
-        tex.minFilter = THREE.LinearFilter;
+          const tex = new THREE.CanvasTexture(canvas);
+          tex.minFilter = THREE.LinearFilter;
+          textureCache[rowIndex] = tex;
+        }
 
         const block = new THREE.Mesh(
-          new THREE.PlaneGeometry(30, 8),
-          new THREE.MeshBasicMaterial({ map: tex, transparent: true }),
+          blockGeometry,
+          new THREE.MeshBasicMaterial({
+            map: textureCache[rowIndex],
+            transparent: true,
+          }),
         );
+
         block.position.set(x, 0.2, z);
         block.rotation.x = -Math.PI / 2;
 
@@ -338,13 +354,13 @@
       function updateInteraction() {
         let target = null;
         for (let n of archiveNodes) {
-          if (player.position.distanceTo(n.position) < 12) {
+          if (player.position.distanceTo(n.position) < 14) {
             target = n;
             break;
           }
         }
 
-        if (isMoving || !target) {
+        if (isMoving || !target || isInteractionPaused) {
           for (let n of archiveNodes) {
             n.userData.targetScale = 1.0;
             n.userData.targetOpacity = 1.0;
@@ -379,6 +395,7 @@
           stayStartTime = null;
           currentTarget = null;
           progressMesh.material.opacity = 0;
+          isInteractionPaused = true;
         }
       }
     </script>
