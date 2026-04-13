@@ -14,7 +14,6 @@
         font-family: 'Georgia', serif;
         background: #ffffff;
         overflow: hidden;
-        /* text-transform: lowercase; <- 강제 소문자화 속성 제거 유지 */
         user-select: none;
       }
 
@@ -56,12 +55,11 @@
         white-space: nowrap;
       }
 
-      /* top 위치를 24px에서 18px로 수정하여 살짝 위로 올림 */
       #ui-layer {
         position: fixed;
-        top: 18px;
-        left: 24px;
-        font-size: 1.3rem;
+        top: 14px;
+        left: 18px;
+        font-size: 1rem;
         letter-spacing: -0.01em;
         color: #000;
         z-index: 1000;
@@ -83,7 +81,7 @@
       </div>
     </div>
 
-    <div id="ui-layer">Arrow keys or wasd: move | stay for 3s to open</div>
+    <div id="ui-layer">Use arrow keys to move and stay to open</div>
 
     <script>
       const SHEET_ID = '19uD7rBe4Ic6nIR-0LJ2anEdeWTZKbR9WlcT-g8wzGx4';
@@ -96,11 +94,8 @@
         ArrowDown: false,
         ArrowLeft: false,
         ArrowRight: false,
-        w: false,
-        a: false,
-        s: false,
-        d: false,
       };
+
       let archiveNodes = [];
       let stayStartTime = null;
       let isMoving = false;
@@ -133,11 +128,10 @@
         camera.position.set(0, 150, 0);
         camera.lookAt(0, 0, 0);
 
-        const grid = new THREE.GridHelper(20000, 1600, 0xf0f0f0, 0xf0f0f0);
-        scene.add(grid);
+        scene.add(new THREE.GridHelper(20000, 1600, 0xf0f0f0, 0xf0f0f0));
 
         player = new THREE.Mesh(
-          new THREE.CircleGeometry(1.5, 32),
+          new THREE.CircleGeometry(0.99, 32),
           new THREE.MeshBasicMaterial({ color: 0x000000 }),
         );
         player.rotation.x = -Math.PI / 2;
@@ -149,12 +143,15 @@
         progressCanvas.height = 128;
         progressCtx = progressCanvas.getContext('2d');
         progressTex = new THREE.CanvasTexture(progressCanvas);
-        const pMatProg = new THREE.MeshBasicMaterial({
-          map: progressTex,
-          transparent: true,
-          opacity: 0,
-        });
-        progressMesh = new THREE.Mesh(new THREE.PlaneGeometry(6, 6), pMatProg);
+
+        progressMesh = new THREE.Mesh(
+          new THREE.PlaneGeometry(3.96, 3.96),
+          new THREE.MeshBasicMaterial({
+            map: progressTex,
+            transparent: true,
+            opacity: 0,
+          }),
+        );
         progressMesh.rotation.x = -Math.PI / 2;
         progressMesh.position.y = 1.0;
         scene.add(progressMesh);
@@ -164,14 +161,15 @@
         renderer.setPixelRatio(window.devicePixelRatio);
         document.body.appendChild(renderer.domElement);
 
-        const keyHandler = (e, v) => {
-          if (e.key in moveKeys) moveKeys[e.key] = v;
-          if (e.key.toLowerCase() in moveKeys)
-            moveKeys[e.key.toLowerCase()] = v;
-          if (v) isInteractionPaused = false;
-        };
-        window.addEventListener('keydown', (e) => keyHandler(e, true));
-        window.addEventListener('keyup', (e) => keyHandler(e, false));
+        window.addEventListener('keydown', (e) => {
+          if (e.key in moveKeys) {
+            moveKeys[e.key] = true;
+            isInteractionPaused = false;
+          }
+        });
+        window.addEventListener('keyup', (e) => {
+          if (e.key in moveKeys) moveKeys[e.key] = false;
+        });
 
         fetchData();
       }
@@ -180,11 +178,17 @@
         try {
           const response = await fetch(CSV_URL);
           const csv = await response.text();
-          const rows = csv.split('\n').slice(1);
+          const rows = csv
+            .split('\n')
+            .slice(1)
+            .filter((r) => r.trim());
 
           const repeat = 60;
           const total = rows.length * repeat;
           const area = 4000;
+
+          const fillEl = document.getElementById('digging-fill');
+          const overlayEl = document.getElementById('intro-overlay');
 
           for (let i = 0; i < total; i++) {
             const rowIndex = i % rows.length;
@@ -205,15 +209,14 @@
             if (!skip) createBlock(r, x, z, rowIndex);
 
             if (i % 200 === 0) {
-              document.getElementById('digging-fill').style.width =
-                (i / total) * 100 + '%';
+              fillEl.style.width = (i / total) * 100 + '%';
               await new Promise((res) => setTimeout(res, 1));
             }
           }
+
           setTimeout(() => {
-            document.getElementById('intro-overlay').style.opacity = '0';
-            document.getElementById('intro-overlay').style.visibility =
-              'hidden';
+            overlayEl.style.opacity = '0';
+            overlayEl.style.visibility = 'hidden';
             isLoaded = true;
           }, 800);
         } catch (e) {
@@ -238,7 +241,6 @@
           canvas.width = 2400;
           canvas.height = 1200;
           const ctx = canvas.getContext('2d');
-          ctx.clearRect(0, 0, 2400, 1200);
 
           ctx.font = '400 144pt Georgia';
           ctx.fillStyle = 'black';
@@ -250,6 +252,7 @@
 
           ctx.font = '400 88pt Georgia';
           ctx.fillStyle = 'black';
+
           const words = (sum || '').toLowerCase().split(' ');
           let line = '';
           let y = 480;
@@ -267,6 +270,8 @@
 
           const tex = new THREE.CanvasTexture(canvas);
           tex.minFilter = THREE.LinearFilter;
+          tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+
           textureCache[rowIndex] = tex;
         }
 
@@ -316,20 +321,20 @@
 
         const s = 1.7;
         isMoving = false;
-        const k = (n) => moveKeys[n] || moveKeys[n.toLowerCase()];
-        if (k('ArrowUp') || k('w')) {
+
+        if (moveKeys.ArrowUp) {
           player.position.z -= s;
           isMoving = true;
         }
-        if (k('ArrowDown') || k('s')) {
+        if (moveKeys.ArrowDown) {
           player.position.z += s;
           isMoving = true;
         }
-        if (k('ArrowLeft') || k('a')) {
+        if (moveKeys.ArrowLeft) {
           player.position.x -= s;
           isMoving = true;
         }
-        if (k('ArrowRight') || k('d')) {
+        if (moveKeys.ArrowRight) {
           player.position.x += s;
           isMoving = true;
         }
@@ -339,13 +344,19 @@
 
         updateInteraction();
 
+        // 불필요한 매 프레임 업데이트 방지 (값의 차이가 있을 때만 렌더링 반영)
         for (let node of archiveNodes) {
           const u = node.userData;
-          u.currentScale += (u.targetScale - u.currentScale) * 0.15;
-          node.scale.set(u.currentScale, u.currentScale, 1);
+          if (
+            Math.abs(u.targetScale - u.currentScale) > 0.001 ||
+            Math.abs(u.targetOpacity - u.currentOpacity) > 0.001
+          ) {
+            u.currentScale += (u.targetScale - u.currentScale) * 0.15;
+            node.scale.set(u.currentScale, u.currentScale, 1);
 
-          u.currentOpacity += (u.targetOpacity - u.currentOpacity) * 0.15;
-          node.material.opacity = u.currentOpacity;
+            u.currentOpacity += (u.targetOpacity - u.currentOpacity) * 0.15;
+            node.material.opacity = u.currentOpacity;
+          }
         }
 
         renderer.render(scene, camera);
@@ -361,12 +372,13 @@
         }
 
         if (isMoving || !target || isInteractionPaused) {
-          for (let n of archiveNodes) {
-            n.userData.targetScale = 1.0;
-            n.userData.targetOpacity = 1.0;
+          // 전체 블록을 무한히 초기화하던 악성 로직 제거 -> 활성화된 타겟만 초기화
+          if (currentTarget) {
+            currentTarget.userData.targetScale = 1.0;
+            currentTarget.userData.targetOpacity = 1.0;
+            currentTarget = null;
           }
           stayStartTime = null;
-          currentTarget = null;
           progressMesh.material.opacity = 0;
           return;
         }
@@ -376,6 +388,11 @@
           stayStartTime = now;
           currentTarget = target;
           progressMesh.material.opacity = 1;
+        } else if (currentTarget !== target) {
+          currentTarget.userData.targetScale = 1.0;
+          currentTarget.userData.targetOpacity = 1.0;
+          currentTarget = target;
+          stayStartTime = now;
         }
 
         const elapsed = (now - stayStartTime) / 1000;
