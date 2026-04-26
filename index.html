@@ -38,9 +38,6 @@
         font-size: 18pt;
         font-weight: 400;
       }
-      #digging-bg {
-        color: #c0c0c0;
-      }
       #digging-fill {
         position: absolute;
         top: 0;
@@ -51,16 +48,28 @@
         transition: width 0.3s ease-out;
         white-space: nowrap;
       }
+      #digging-bg {
+        color: #c0c0c0;
+      }
       #ui-layer {
         position: fixed;
         top: 14px;
         left: 18px;
         font-size: 1rem;
-        letter-spacing: -0.01em;
         color: #000;
         z-index: 1000;
         pointer-events: none;
         opacity: 0.5;
+      }
+      #admin-status {
+        position: fixed;
+        top: 14px;
+        right: 18px;
+        font-size: 0.9rem;
+        color: red;
+        font-weight: bold;
+        display: none;
+        z-index: 2000;
       }
       #minimap {
         position: fixed;
@@ -88,8 +97,28 @@
       </div>
     </div>
     <div id="ui-layer">Use arrow keys to move and stay to open</div>
+    <div id="admin-status">ADMIN MODE ACTIVE</div>
     <canvas id="minimap" width="200" height="200"></canvas>
+
     <script>
+      let savedPositions =
+        JSON.parse(localStorage.getItem('archive_fixed_pos')) || {};
+
+      function mulberry32(a) {
+        return function () {
+          let t = (a += 0x6d2b79f5);
+          t = Math.imul(t ^ (t >>> 15), t | 1);
+          t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+          return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+        };
+      }
+      function getSeedFromStr(str) {
+        let hash = 0;
+        for (let i = 0; i < str.length; i++)
+          hash = (Math.imul(31, hash) + str.charCodeAt(i)) | 0;
+        return hash;
+      }
+
       const SHEET_ID = '19uD7rBe4Ic6nIR-0LJ2anEdeWTZKbR9WlcT-g8wzGx4';
       const GID = '729859851';
       const CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${GID}`;
@@ -101,18 +130,22 @@
         ArrowLeft: false,
         ArrowRight: false,
       };
+      let mouseEdge = { up: false, down: false, left: false, right: false };
+      let comboKeys = { k: false, enter: false };
       let mainWorldNodes = [],
         mapWorldNodes = [],
         activeNodes = mainWorldNodes;
-      let stayStartTime = null,
-        isMoving = false,
-        isLoaded = false,
-        currentTarget = null,
+      let isLoaded = false,
         isInteractionPaused = false;
       let progressMesh, progressTex, progressCanvas, progressCtx;
       const blockGeometry = new THREE.PlaneGeometry(30, 15);
       const textureCache = {};
       const minimapCtx = document.getElementById('minimap').getContext('2d');
+
+      let isAdminMode = false,
+        draggedNode = null;
+      const raycaster = new THREE.Raycaster(),
+        mouse = new THREE.Vector2();
 
       const rawMainChambers = [
         [0, 0, 230],
@@ -174,6 +207,8 @@
       let _activeChambers = [],
         _activeTunnels = [];
       let mainFloorGroup, mapFloorGroup, _mainConfig, _mapConfig;
+      let stayStartTime = null,
+        currentTarget = null;
 
       function colonySDF(x, z, chambers, tunnels) {
         let d = -Infinity;
@@ -214,9 +249,10 @@
         tunnels.forEach(([a, b, hw]) => {
           const p1 = chambers[a],
             p2 = chambers[b];
+          if (!p1 || !p2) return;
           const dx = p2[0] - p1[0],
-            dz = p2[1] - p1[1];
-          const dist = Math.hypot(dx, dz),
+            dz = p2[1] - p1[1],
+            dist = Math.hypot(dx, dz),
             angle = Math.atan2(dz, dx);
           const mesh = new THREE.Mesh(
             new THREE.PlaneGeometry(dist, hw * 2),
@@ -232,9 +268,6 @@
         group.position.y = -0.1;
         return group;
       }
-
-      init();
-      animate();
 
       function init() {
         scene = new THREE.Scene();
@@ -277,17 +310,91 @@
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.setPixelRatio(window.devicePixelRatio);
         document.body.appendChild(renderer.domElement);
+
         window.addEventListener('resize', onWindowResize);
-        window.addEventListener('keydown', (e) => {
-          if (e.key in moveKeys) {
-            moveKeys[e.key] = true;
-            isInteractionPaused = false;
-          }
-        });
-        window.addEventListener('keyup', (e) => {
-          if (e.key in moveKeys) moveKeys[e.key] = false;
-        });
+        window.addEventListener('keydown', onKeyDown);
+        window.addEventListener('keyup', onKeyUp);
+        window.addEventListener('mousedown', onMouseDown);
+        window.addEventListener('mousemove', onMouseMove);
+        window.addEventListener('mouseup', onMouseUp);
+
         fetchData();
+        animate();
+      }
+
+      function onKeyDown(e) {
+        if (e.key in moveKeys) {
+          moveKeys[e.key] = true;
+          isInteractionPaused = false;
+        }
+        if (e.key.toLowerCase() === 'k') comboKeys.k = true;
+        if (e.key === 'Enter') comboKeys.enter = true;
+
+        if (comboKeys.k && comboKeys.enter) {
+          isAdminMode = !isAdminMode;
+          document.getElementById('admin-status').style.display = isAdminMode
+            ? 'block'
+            : 'none';
+          comboKeys.k = comboKeys.enter = false;
+          if (!isAdminMode)
+            Object.keys(mouseEdge).forEach((k) => (mouseEdge[k] = false));
+        }
+      }
+
+      function onKeyUp(e) {
+        if (e.key in moveKeys) moveKeys[e.key] = false;
+        if (e.key.toLowerCase() === 'k') comboKeys.k = false;
+        if (e.key === 'Enter') comboKeys.enter = false;
+      }
+
+      function onMouseDown(e) {
+        if (!isAdminMode) return;
+        mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+        mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+        raycaster.setFromCamera(mouse, camera);
+        const intersects = raycaster.intersectObjects(activeNodes);
+        if (intersects.length > 0 && !intersects[0].object.userData.isPortal)
+          draggedNode = intersects[0].object;
+      }
+
+      function updateDraggedNodePos() {
+        if (draggedNode) {
+          raycaster.setFromCamera(mouse, camera);
+          const vector = new THREE.Vector3(mouse.x, mouse.y, 0.5).unproject(
+            camera,
+          );
+          draggedNode.position.x = vector.x;
+          draggedNode.position.z = vector.z;
+        }
+      }
+
+      function onMouseMove(e) {
+        mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+        mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+
+        if (isAdminMode) {
+          updateDraggedNodePos();
+          const m = 50;
+          mouseEdge.left = e.clientX < m;
+          mouseEdge.right = e.clientX > window.innerWidth - m;
+          mouseEdge.up = e.clientY < m;
+          mouseEdge.down = e.clientY > window.innerHeight - m;
+        }
+      }
+
+      function onMouseUp() {
+        if (isAdminMode && draggedNode) {
+          const title = draggedNode.userData.title;
+          savedPositions[title] = [
+            Math.round(draggedNode.position.x),
+            Math.round(draggedNode.position.z),
+          ];
+          localStorage.setItem(
+            'archive_fixed_pos',
+            JSON.stringify(savedPositions),
+          );
+        }
+        draggedNode = null;
       }
 
       function onWindowResize() {
@@ -312,7 +419,6 @@
           const total = rows.length;
           const fillEl = document.getElementById('digging-fill');
           const overlayEl = document.getElementById('intro-overlay');
-
           let chamberUsageMain = new Array(rawMainChambers.length).fill(0);
           let chamberUsageMap = new Array(rawMapChambers.length).fill(0);
           let categoryCounts = {};
@@ -320,95 +426,93 @@
           for (let i = 0; i < total; i++) {
             const r = rows[i],
               c = r.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
+            const url = c[0]?.replace(/"/g, '').trim(),
+              title = url
+                .replace(/^(https?:\/\/)?(www\.)?/, '')
+                .split(/[/?#:]/)[0];
             const rawCat = c[1]?.replace(/"/g, '').trim().toLowerCase() || '';
             const hasSound = /\bsound\b/.test(rawCat),
               hasSub = /\bsubculture\b/.test(rawCat),
               hasOut = /\boutdoor\b/.test(rawCat),
               isMap = /\bmap\b/.test(rawCat);
-            const tArr = isMap ? mapWorldNodes : mainWorldNodes;
-
-            let targetX = 0,
-              targetZ = 0,
-              baseDist = 0;
-            if (!isMap) {
-              let dirX = 0,
-                dirZ = 0;
-              const matchCount = [hasSound, hasSub, hasOut].filter(
-                Boolean,
-              ).length;
-              if (matchCount === 0) {
-                targetX = 0;
-                targetZ = 0;
-                baseDist = 80;
-              } else {
-                if (hasSound) {
-                  dirX -= 0.7;
-                  dirZ -= 1;
-                }
-                if (hasSub) {
-                  dirX += 0.7;
-                  dirZ -= 1;
-                }
-                if (hasOut) {
-                  dirZ += 1;
-                }
-                const len = Math.hypot(dirX, dirZ) || 1;
-                dirX /= len;
-                dirZ /= len;
-                baseDist =
-                  matchCount === 1 ? 1000 : matchCount === 2 ? 500 : 50;
-                targetX = dirX * baseDist;
-                targetZ = dirZ * baseDist;
-              }
-            }
-
-            const key = isMap
-              ? 'map'
-              : `${Math.round(targetX)}_${Math.round(targetZ)}`;
-            if (!categoryCounts[key]) categoryCounts[key] = 1;
             let x,
               z,
-              placed = false,
-              attempts = 0;
-            while (!placed && attempts < 4000) {
-              const n = categoryCounts[key],
-                angle = n * 2.39996 + Math.random() * 0.5;
-              const localR = (isMap ? 110 : 80) * Math.sqrt(n);
-              x = targetX + Math.cos(angle) * localR;
-              z = targetZ + Math.sin(angle) * localR;
-              categoryCounts[key]++;
-              attempts++;
-
-              if (
-                colonySDF(
-                  x,
-                  z,
-                  isMap ? rawMapChambers : rawMainChambers,
-                  isMap ? rawMapTunnels : rawMainTunnels,
-                ) > 16
-              ) {
-                let overlap = false;
-                for (const nd of tArr) {
-                  if (
-                    Math.abs(x - nd.position.x) < 42 &&
-                    Math.abs(z - nd.position.z) < 28
-                  ) {
-                    overlap = true;
-                    break;
+              placed = false;
+            if (savedPositions[title]) {
+              x = savedPositions[title][0];
+              z = savedPositions[title][1];
+              placed = true;
+            } else {
+              const seededRandom = mulberry32(getSeedFromStr(url));
+              let tx = 0,
+                tz = 0,
+                baseDist = 0;
+              if (!isMap) {
+                let dx = 0,
+                  dz = 0;
+                const count = [hasSound, hasSub, hasOut].filter(Boolean).length;
+                if (count > 0) {
+                  if (hasSound) dx -= 1;
+                  if (hasSub) dx += 1;
+                  if (hasOut) dz += 1;
+                  const len = Math.hypot(dx, dz) || 1;
+                  dx /= len;
+                  dz /= len;
+                  baseDist = count === 1 ? 1200 : count === 2 ? 500 : 50;
+                  tx = dx * baseDist;
+                  tz = dz * baseDist;
+                } else baseDist = 100;
+              }
+              const key = isMap ? 'map' : `${Math.round(tx)}_${Math.round(tz)}`;
+              if (!categoryCounts[key]) categoryCounts[key] = 1;
+              let att = 0;
+              while (!placed && att < 3000) {
+                const n = categoryCounts[key],
+                  angle = n * 2.39996 + seededRandom() * 0.5,
+                  lr = (isMap ? 110 : 80) * Math.sqrt(n);
+                x = tx + Math.cos(angle) * lr;
+                z = tz + Math.sin(angle) * lr;
+                categoryCounts[key]++;
+                att++;
+                if (
+                  colonySDF(
+                    x,
+                    z,
+                    isMap ? rawMapChambers : rawMainChambers,
+                    isMap ? rawMapTunnels : rawMainTunnels,
+                  ) > 16
+                ) {
+                  let overlap = false;
+                  const nodes = isMap ? mapWorldNodes : mainWorldNodes;
+                  for (const nd of nodes) {
+                    if (
+                      Math.abs(x - nd.position.x) < 42 &&
+                      Math.abs(z - nd.position.z) < 28
+                    ) {
+                      overlap = true;
+                      break;
+                    }
                   }
-                }
-                if (!overlap) {
-                  placed = true;
-                  const usage = isMap ? chamberUsageMap : chamberUsageMain;
-                  const chams = isMap ? rawMapChambers : rawMainChambers;
-                  chams.forEach((ch, idx) => {
-                    if (Math.hypot(x - ch[0], z - ch[1]) < ch[2] + 40)
-                      usage[idx]++;
-                  });
+                  if (!overlap) placed = true;
                 }
               }
             }
-            if (placed) createBlock(r, x, z, i, tArr, rawCat, isMap);
+            if (placed) {
+              createBlock(
+                r,
+                x,
+                z,
+                i,
+                isMap ? mapWorldNodes : mainWorldNodes,
+                rawCat,
+                isMap,
+              );
+              const usage = isMap ? chamberUsageMap : chamberUsageMain;
+              const chams = isMap ? rawMapChambers : rawMainChambers;
+              chams.forEach((ch, idx) => {
+                if (Math.hypot(x - ch[0], z - ch[1]) < ch[2] + 40) usage[idx]++;
+              });
+            }
             if (i % 10 === 0) {
               fillEl.style.width = (i / total) * 100 + '%';
               await new Promise((res) => setTimeout(res, 1));
@@ -503,14 +607,11 @@
       ) {
         const c = row.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
         const url = c[0]?.replace(/"/g, '').trim(),
-          meta = c[2]?.replace(/"/g, '').trim() || '',
+          title = url.replace(/^(https?:\/\/)?(www\.)?/, '').split(/[/?#:]/)[0];
+        const meta = c[2]?.replace(/"/g, '').trim() || '',
           sum = c[3]?.replace(/"/g, '').trim();
         if (!url) return;
         if (!textureCache[rowIndex]) {
-          const disp = url
-            .replace(/^(https?:\/\/)?(www\.)?/, '')
-            .split(/[/?#:]/)[0]
-            .toLowerCase();
           const cv = document.createElement('canvas');
           cv.width = 2400;
           cv.height = 1200;
@@ -520,7 +621,7 @@
           ctx.fillText(meta.toUpperCase(), 80, 120);
           ctx.font = '400 144pt Georgia';
           ctx.fillStyle = 'black';
-          ctx.fillText(disp, 80, 280);
+          ctx.fillText(title, 80, 280);
           ctx.font = '400 80pt Georgia';
           ctx.fillStyle = '#999999';
           ctx.fillText(cat, 88, 420);
@@ -554,6 +655,7 @@
         block.rotation.x = -Math.PI / 2;
         block.userData = {
           url: url.startsWith('http') ? url : 'https://' + url,
+          title: title,
           targetScale: 1.0,
           currentScale: 1.0,
           targetOpacity: 1.0,
@@ -595,6 +697,7 @@
         minimapCtx.fillStyle = '#ffffff';
         minimapCtx.strokeStyle = '#ffffff';
         for (const [a, b, hw] of _activeTunnels) {
+          if (!_activeChambers[a] || !_activeChambers[b]) continue;
           minimapCtx.lineWidth = hw * 2;
           minimapCtx.lineCap = 'round';
           minimapCtx.beginPath();
@@ -644,43 +747,46 @@
       function animate() {
         requestAnimationFrame(animate);
         if (!isLoaded) return;
+
         const s = 4.0;
-        isMoving = false;
         let nx = player.position.x,
           nz = player.position.z,
           moved = false;
-        if (moveKeys.ArrowUp) {
+
+        if (moveKeys.ArrowUp || (isAdminMode && mouseEdge.up)) {
           nz -= s;
           moved = true;
         }
-        if (moveKeys.ArrowDown) {
+        if (moveKeys.ArrowDown || (isAdminMode && mouseEdge.down)) {
           nz += s;
           moved = true;
         }
-        if (moveKeys.ArrowLeft) {
+        if (moveKeys.ArrowLeft || (isAdminMode && mouseEdge.left)) {
           nx -= s;
           moved = true;
         }
-        if (moveKeys.ArrowRight) {
+        if (moveKeys.ArrowRight || (isAdminMode && mouseEdge.right)) {
           nx += s;
           moved = true;
         }
+
         if (moved) {
           if (isPlayerInside(nx, nz)) {
             player.position.x = nx;
             player.position.z = nz;
-            isMoving = true;
           } else if (isPlayerInside(nx, player.position.z)) {
             player.position.x = nx;
-            isMoving = true;
           } else if (isPlayerInside(player.position.x, nz)) {
             player.position.z = nz;
-            isMoving = true;
           }
+          if (isAdminMode && draggedNode) updateDraggedNodePos();
         }
+
         camera.position.set(player.position.x, 150, player.position.z);
         progressMesh.position.set(player.position.x, 1.0, player.position.z);
-        updateInteraction();
+
+        if (!isAdminMode) updateInteraction();
+
         for (const node of activeNodes) {
           const u = node.userData;
           if (
@@ -708,7 +814,7 @@
             break;
           }
         }
-        if (isMoving || !target || isInteractionPaused) {
+        if (!target || isInteractionPaused) {
           if (currentTarget) {
             currentTarget.userData.targetScale = 1.0;
             currentTarget.userData.targetOpacity = currentTarget.userData
@@ -731,7 +837,6 @@
         drawProgress(ratio);
         if (currentTarget) {
           if (currentTarget.userData.isPortal) {
-            currentTarget.userData.targetScale = 1.0;
             currentTarget.userData.targetOpacity = 0.5 - 0.25 * ratio;
           } else {
             currentTarget.userData.targetScale = 1.1;
@@ -742,19 +847,14 @@
           if (currentTarget.userData.isPortal)
             switchWorld(currentTarget.userData.dest);
           else window.open(currentTarget.userData.url, '_blank');
-          if (currentTarget) {
-            currentTarget.userData.targetScale = 1.0;
-            currentTarget.userData.targetOpacity = currentTarget.userData
-              .isPortal
-              ? 0.5
-              : 1.0;
-          }
           stayStartTime = null;
           currentTarget = null;
           progressMesh.material.opacity = 0;
           isInteractionPaused = true;
         }
       }
+
+      init();
     </script>
   </body>
 </html>
