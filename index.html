@@ -748,26 +748,48 @@
         requestAnimationFrame(animate);
         if (!isLoaded) return;
 
-        const s = 4.0;
+        // 이동 속도 조절 (2.5로 하향)
+        const s = 2.5;
         let nx = player.position.x,
           nz = player.position.z,
           moved = false;
 
-        if (moveKeys.ArrowUp || (isAdminMode && mouseEdge.up)) {
+        // 키보드는 항상 가능
+        if (moveKeys.ArrowUp) {
           nz -= s;
           moved = true;
         }
-        if (moveKeys.ArrowDown || (isAdminMode && mouseEdge.down)) {
+        if (moveKeys.ArrowDown) {
           nz += s;
           moved = true;
         }
-        if (moveKeys.ArrowLeft || (isAdminMode && mouseEdge.left)) {
+        if (moveKeys.ArrowLeft) {
           nx -= s;
           moved = true;
         }
-        if (moveKeys.ArrowRight || (isAdminMode && mouseEdge.right)) {
+        if (moveKeys.ArrowRight) {
           nx += s;
           moved = true;
+        }
+
+        // 마우스 에지 스크롤은 관리자 모드에서만 가능
+        if (isAdminMode) {
+          if (mouseEdge.up) {
+            nz -= s;
+            moved = true;
+          }
+          if (mouseEdge.down) {
+            nz += s;
+            moved = true;
+          }
+          if (mouseEdge.left) {
+            nx -= s;
+            moved = true;
+          }
+          if (mouseEdge.right) {
+            nx += s;
+            moved = true;
+          }
         }
 
         if (moved) {
@@ -779,6 +801,7 @@
           } else if (isPlayerInside(player.position.x, nz)) {
             player.position.z = nz;
           }
+
           if (isAdminMode && draggedNode) updateDraggedNodePos();
         }
 
