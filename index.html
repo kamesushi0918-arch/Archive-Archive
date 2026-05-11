@@ -355,8 +355,8 @@
         ArrowDown: false,
         ArrowLeft: false,
         ArrowRight: false,
-        '[': false,
-        ']': false,
+        '<': false,
+        '>': false,
         Shift: false,
       };
       let mouseEdge = { up: false, down: false, left: false, right: false };
@@ -753,7 +753,8 @@
               .replace(/^(https?:\/\/)?(www\.)?/, '')
               .split(/[/?#:]/)[0];
             const rawCat = (c[1] || '').trim().toLowerCase();
-            const isMap = /\bmap\b/.test(rawCat);
+            // ── 변경: sound 카테고리 → 포털 공간, map 포함 나머지 → 메인 맵 ──
+            const isMap = /\bsound\b/.test(rawCat);
             const meta = (c[2] || '').replace(/"/g, '').trim();
             const sum = (c[3] || '').replace(/"/g, '').trim();
 
@@ -786,12 +787,10 @@
                 let dx = 0,
                   dz = 0;
                 const count = [
-                  /\bsound\b/.test(rawCat),
                   /\bsubculture\b/.test(rawCat),
                   /\boutdoor\b/.test(rawCat),
                 ].filter(Boolean).length;
                 if (count > 0) {
-                  if (/\bsound\b/.test(rawCat)) dx -= 1;
                   if (/\bsubculture\b/.test(rawCat)) dx += 1;
                   if (/\boutdoor\b/.test(rawCat)) dz += 1;
                   const len = Math.hypot(dx, dz) || 1;
@@ -1086,11 +1085,11 @@
             nx += s;
             moved = true;
           }
-          if (moveKeys['[']) {
+          if (moveKeys['<']) {
             camera.zoom = Math.max(0.05, camera.zoom - 0.02);
             camera.updateProjectionMatrix();
           }
-          if (moveKeys[']']) {
+          if (moveKeys['>']) {
             camera.zoom = Math.min(5.0, camera.zoom + 0.02);
             camera.updateProjectionMatrix();
           }
