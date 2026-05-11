@@ -213,6 +213,12 @@
         margin-bottom: 0; /* ← summary 아래 간격 */
       }
 
+      /* ── 선택된 노드 강조 ── */
+      .node-label.selected {
+        outline: 1.5px solid red;
+        outline-offset: 4px;
+      }
+
       /* ── 포털 ── */
       .portal-node {
         position: absolute;
@@ -583,28 +589,54 @@
         if (e.key === 'Shift') moveKeys.Shift = false;
       }
 
+      function updateSelectionVisuals() {
+        activeNodes.forEach((n) => {
+          if (n.userData.domElement && !n.userData.isPortal) {
+            n.userData.domElement.classList.toggle(
+              'selected',
+              selectedNodes.includes(n),
+            );
+          }
+        });
+      }
+
       function onMouseDown(e) {
         if (!isAdminMode) return;
         mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
         mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
         raycaster.setFromCamera(mouse, camera);
+
+        const intersects = raycaster.intersectObjects(activeNodes);
+        const hit = intersects.length > 0 ? intersects[0].object : null;
+
         if (e.shiftKey) {
-          isSelecting = true;
-          selectionStart.set(e.clientX, e.clientY);
-          const rect = document.getElementById('selection-rect');
-          rect.style.display = 'block';
-          rect.style.left = e.clientX + 'px';
-          rect.style.top = e.clientY + 'px';
-          rect.style.width = '0px';
-          rect.style.height = '0px';
-          selectedNodes = [];
+          if (hit) {
+            // Shift+클릭: 개별 노드 선택 토글
+            const idx = selectedNodes.indexOf(hit);
+            if (idx === -1) selectedNodes.push(hit);
+            else selectedNodes.splice(idx, 1);
+            updateSelectionVisuals();
+          } else {
+            // Shift+빈공간 드래그: 박스 선택 (기존 선택에 추가)
+            isSelecting = true;
+            selectionStart.set(e.clientX, e.clientY);
+            const rect = document.getElementById('selection-rect');
+            rect.style.display = 'block';
+            rect.style.left = e.clientX + 'px';
+            rect.style.top = e.clientY + 'px';
+            rect.style.width = '0px';
+            rect.style.height = '0px';
+          }
           return;
         }
-        const intersects = raycaster.intersectObjects(activeNodes);
-        if (intersects.length > 0) {
-          draggedNode = intersects[0].object;
-          if (!selectedNodes.includes(draggedNode))
+
+        if (hit) {
+          draggedNode = hit;
+          // 이미 선택된 노드를 클릭하면 선택 유지, 아니면 단독 선택
+          if (!selectedNodes.includes(draggedNode)) {
             selectedNodes = [draggedNode];
+            updateSelectionVisuals();
+          }
           const vector = new THREE.Vector3(mouse.x, mouse.y, 0.5).unproject(
             camera,
           );
@@ -613,7 +645,9 @@
             (n) => (n.userData.startPos = n.position.clone()),
           );
         } else {
+          // 빈 공간 클릭: 선택 해제
           selectedNodes = [];
+          updateSelectionVisuals();
         }
       }
 
@@ -660,9 +694,16 @@
             const p = n.position.clone().project(camera);
             const x = ((p.x + 1) * window.innerWidth) / 2,
               y = ((-p.y + 1) * window.innerHeight) / 2;
-            if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom)
+            if (
+              x >= r.left &&
+              x <= r.right &&
+              y >= r.top &&
+              y <= r.bottom &&
+              !selectedNodes.includes(n)
+            )
               selectedNodes.push(n);
           });
+          updateSelectionVisuals();
           return;
         }
         if (selectedNodes.length > 0) {
