@@ -1,0 +1,1207 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Archive</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        font-family: 'Georgia', serif;
+        background: #cccccc;
+        overflow: hidden;
+        user-select: none;
+      }
+      #intro-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background: #ffffff;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        z-index: 5000;
+        transition:
+          opacity 1.5s ease-in-out,
+          visibility 1.5s;
+        pointer-events: none;
+      }
+      #digging-container {
+        position: relative;
+        font-size: 18pt;
+        font-weight: 400;
+      }
+      #digging-fill {
+        position: absolute;
+        top: 0;
+        left: 0;
+        color: black;
+        overflow: hidden;
+        width: 0%;
+        transition: width 0.3s ease-out;
+        white-space: nowrap;
+      }
+      #digging-bg {
+        color: #c0c0c0;
+      }
+      #ui-layer {
+        position: fixed;
+        top: 14px;
+        left: 18px;
+        font-size: 1rem;
+        color: #000;
+        z-index: 1000;
+        pointer-events: none;
+        opacity: 0.5;
+      }
+      #admin-status {
+        position: fixed;
+        top: 14px;
+        right: 18px;
+        font-size: 0.9rem;
+        color: red;
+        font-weight: bold;
+        display: none;
+        z-index: 2000;
+      }
+      #minimap {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        width: 200px;
+        height: 200px;
+        background: #cccccc;
+        border: 1px solid #999999;
+        z-index: 1000;
+        pointer-events: none;
+        overflow: hidden;
+      }
+      #selection-rect {
+        position: fixed;
+        border: 1px solid red;
+        background: rgba(255, 0, 0, 0.15);
+        pointer-events: none;
+        display: none;
+        z-index: 3000;
+      }
+      #link-list-panel {
+        position: fixed;
+        top: 50px;
+        left: 18px;
+        width: 320px;
+        max-height: 70vh;
+        background: rgba(255, 255, 255, 0.95);
+        border: 1px solid #999;
+        padding: 15px;
+        overflow-y: auto;
+        display: none;
+        z-index: 4000;
+        font-size: 0.85rem;
+      }
+      #link-list-panel h3 {
+        margin-bottom: 15px;
+        font-size: 1rem;
+        border-bottom: 2px solid #ccc;
+        padding-bottom: 8px;
+      }
+      .link-item {
+        padding: 8px 0;
+        cursor: pointer;
+        color: #333;
+        border-bottom: 1px solid #eee;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .link-item-header {
+        display: flex;
+        gap: 8px;
+        font-weight: bold;
+      }
+      .link-item-header span {
+        color: #888;
+        min-width: 25px;
+      }
+      .link-item-url {
+        font-size: 0.75rem;
+        color: #666;
+        word-break: break-all;
+        padding-left: 33px;
+      }
+      .link-item:hover {
+        background: rgba(255, 0, 0, 0.05);
+      }
+      .link-item:hover .link-item-header {
+        color: red;
+      }
+      canvas {
+        display: block;
+      }
+
+      #labels-layer {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        pointer-events: none;
+        z-index: 500;
+      }
+
+      /* ── 노드 라벨: 배경 투명, Georgia regular ── */
+      .node-label {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: max-content;
+        white-space: nowrap;
+        background: transparent;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0; /* 개별 margin-bottom으로 각각 조절 */
+        will-change: transform, opacity;
+        pointer-events: none;
+        font-family: 'Georgia', serif;
+        font-weight: 400;
+        font-style: normal;
+        line-height: 1.35;
+        color: #000;
+      }
+
+      .node-meta {
+        font-size: 20px;
+        color: #666666;
+        font-weight: 400;
+        font-style: normal;
+        line-height: 1.35;
+        margin-bottom: -3px; /* ← meta 아래 간격 */
+      }
+
+      .node-title {
+        font-size: 30px;
+        color: #000000;
+        font-weight: 400;
+        line-height: 1.35;
+        margin-bottom: 2px; /* ← title 아래 간격 */
+      }
+
+      .node-cat {
+        font-size: 16px;
+        color: #999999;
+        font-weight: 400;
+        font-style: normal;
+        line-height: 1.35;
+        margin-bottom: 2px; /* ← cat 아래 간격 */
+      }
+
+      .node-sum {
+        font-size: 18px;
+        color: #000000;
+        font-weight: 400;
+        font-style: normal;
+        line-height: 1.35;
+        white-space: normal;
+        max-width: 480px;
+        margin-bottom: 0; /* ← summary 아래 간격 */
+      }
+
+      /* ── 포털 ── */
+      .portal-node {
+        position: absolute;
+        top: 0;
+        left: 0;
+        background: rgba(0, 0, 0, 0.5);
+        border-radius: 50%;
+        pointer-events: none;
+        will-change: transform, opacity;
+      }
+
+      /* ── 플레이어 & 진행 링 ── */
+      #player-dot {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        background: black;
+        border-radius: 50%;
+        transform: translate(-50%, -50%);
+        z-index: 1000;
+        pointer-events: none;
+      }
+      #progress-ring {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%) rotate(-90deg);
+        z-index: 999;
+        pointer-events: none;
+        opacity: 0;
+      }
+      #progress-ring circle {
+        stroke-dasharray: 283;
+        stroke-dashoffset: 283;
+        transition: stroke-dashoffset 0.1s linear;
+      }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  </head>
+  <body>
+    <div id="intro-overlay">
+      <div id="digging-container">
+        <span id="digging-bg">Archive digging...</span>
+        <div id="digging-fill">Archive digging...</div>
+      </div>
+    </div>
+    <div id="ui-layer">Use arrow keys to move and stay to open</div>
+    <div id="admin-status">
+      ADMIN MODE ACTIVE (Shift+Drag: Select / L: List / Drag: Move)
+    </div>
+    <div id="selection-rect"></div>
+    <div id="link-list-panel">
+      <h3>Archive Nodes (A-Z) <span id="node-count"></span></h3>
+      <div id="link-items-container"></div>
+    </div>
+    <div id="labels-layer" style="opacity: 0; transition: opacity 0.8s"></div>
+    <div id="player-dot"></div>
+    <svg id="progress-ring" viewBox="0 0 100 100">
+      <circle
+        cx="50"
+        cy="50"
+        r="45"
+        fill="none"
+        stroke="black"
+        stroke-width="8"
+      />
+    </svg>
+    <canvas id="minimap" width="200" height="200"></canvas>
+
+    <script>
+      let savedPositions =
+        JSON.parse(localStorage.getItem('archive_fixed_pos')) || {};
+      const SHEET_ID = '19uD7rBe4Ic6nIR-0LJ2anEdeWTZKbR9WlcT-g8wzGx4';
+      const GID = '729859851';
+      const S = 0.5;
+
+      function mulberry32(a) {
+        return function () {
+          let t = (a += 0x6d2b79f5);
+          t = Math.imul(t ^ (t >>> 15), t | 1);
+          t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+          return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+        };
+      }
+
+      function getSeedFromStr(str) {
+        let hash = 0;
+        for (let i = 0; i < str.length; i++)
+          hash = (Math.imul(31, hash) + str.charCodeAt(i)) | 0;
+        return hash;
+      }
+
+      function parseCSV(str) {
+        const arr = [];
+        let quote = false,
+          row = 0,
+          col = 0;
+        for (let c = 0; c < str.length; c++) {
+          let cc = str[c],
+            nc = str[c + 1];
+          arr[row] = arr[row] || [];
+          arr[row][col] = arr[row][col] || '';
+          if (cc === '"' && quote && nc === '"') {
+            arr[row][col] += cc;
+            ++c;
+            continue;
+          }
+          if (cc === '"') {
+            quote = !quote;
+            continue;
+          }
+          if (cc === ',' && !quote) {
+            ++col;
+            continue;
+          }
+          if (cc === '\r' && nc === '\n' && !quote) {
+            ++row;
+            col = 0;
+            ++c;
+            continue;
+          }
+          if (cc === '\n' && !quote) {
+            ++row;
+            col = 0;
+            continue;
+          }
+          if (cc === '\r' && !quote) {
+            ++row;
+            col = 0;
+            continue;
+          }
+          arr[row][col] += cc;
+        }
+        return arr;
+      }
+
+      let scene, camera, renderer, player;
+      let moveKeys = {
+        ArrowUp: false,
+        ArrowDown: false,
+        ArrowLeft: false,
+        ArrowRight: false,
+        '[': false,
+        ']': false,
+        Shift: false,
+      };
+      let mouseEdge = { up: false, down: false, left: false, right: false };
+      let comboKeys = { k: false, enter: false };
+      let mainWorldNodes = [],
+        mapWorldNodes = [],
+        activeNodes = mainWorldNodes;
+      let isLoaded = false,
+        isInteractionPaused = false;
+      const minimapCtx = document.getElementById('minimap').getContext('2d');
+      let isAdminMode = false,
+        draggedNode = null,
+        selectedNodes = [];
+      let dragStartWorld = new THREE.Vector3(),
+        selectionStart = new THREE.Vector2();
+      let isSelecting = false;
+      const raycaster = new THREE.Raycaster(),
+        mouse = new THREE.Vector2();
+
+      const rawMainChambers = [
+        [0 * S, 0 * S, 230 * S],
+        [-100 * S, -700 * S, 160 * S],
+        [-200 * S, -1150 * S, 130 * S],
+        [200 * S, -1050 * S, 100 * S],
+        [100 * S, 800 * S, 140 * S],
+        [60 * S, 1250 * S, 110 * S],
+        [-700 * S, 100 * S, 180 * S],
+        [-1200 * S, -60 * S, 150 * S],
+        [-1550 * S, 180 * S, 110 * S],
+        [900 * S, -100 * S, 170 * S],
+        [1400 * S, 50 * S, 145 * S],
+        [1750 * S, -130 * S, 100 * S],
+        [-480 * S, 520 * S, 100 * S],
+        [-900 * S, 720 * S, 85 * S],
+        [620 * S, -580 * S, 100 * S],
+        [950 * S, -820 * S, 80 * S],
+      ];
+      const rawMainTunnels = [
+        [0, 1, 55 * S],
+        [1, 2, 42 * S],
+        [1, 3, 38 * S],
+        [0, 4, 50 * S],
+        [4, 5, 40 * S],
+        [0, 6, 60 * S],
+        [6, 7, 48 * S],
+        [7, 8, 40 * S],
+        [0, 9, 58 * S],
+        [9, 10, 50 * S],
+        [10, 11, 36 * S],
+        [0, 12, 42 * S],
+        [12, 13, 32 * S],
+        [1, 14, 36 * S],
+        [14, 15, 28 * S],
+      ];
+      const rawMapChambers = [
+        [0 * S, 0 * S, 220 * S],
+        [-320 * S, -240 * S, 160 * S],
+        [350 * S, -200 * S, 150 * S],
+        [0 * S, 380 * S, 160 * S],
+        [-480 * S, 80 * S, 130 * S],
+        [480 * S, 120 * S, 130 * S],
+        [-160 * S, -520 * S, 130 * S],
+        [220 * S, -500 * S, 120 * S],
+        [-520 * S, -280 * S, 110 * S],
+        [400 * S, 380 * S, 110 * S],
+        [-200 * S, 550 * S, 100 * S],
+        [200 * S, 560 * S, 100 * S],
+      ];
+      const rawMapTunnels = [
+        [0, 1, 55 * S],
+        [0, 2, 50 * S],
+        [0, 3, 55 * S],
+        [0, 4, 50 * S],
+        [0, 5, 48 * S],
+        [1, 4, 44 * S],
+        [1, 6, 42 * S],
+        [1, 8, 38 * S],
+        [2, 5, 44 * S],
+        [2, 7, 40 * S],
+        [3, 9, 40 * S],
+        [3, 10, 38 * S],
+        [3, 11, 38 * S],
+        [6, 7, 36 * S],
+        [8, 6, 34 * S],
+        [9, 5, 36 * S],
+        [10, 11, 34 * S],
+      ];
+
+      let _activeChambers = [],
+        _activeTunnels = [];
+      let mainFloorGroup, mapFloorGroup, _mainConfig, _mapConfig;
+      let stayStartTime = null,
+        currentTarget = null;
+
+      function colonySDF(x, z, chambers, tunnels) {
+        let d = -Infinity;
+        if (!chambers || !chambers.length) return d;
+        for (const [cx, cz, r] of chambers)
+          d = Math.max(d, r - Math.hypot(x - cx, z - cz));
+        for (const [a, b, hw] of tunnels) {
+          if (!chambers[a] || !chambers[b]) continue;
+          const ax = chambers[a][0],
+            az = chambers[a][1],
+            bx = chambers[b][0],
+            bz = chambers[b][1];
+          const dx = bx - ax,
+            dz = bz - az,
+            len2 = dx * dx + dz * dz;
+          const t =
+            len2 > 0
+              ? Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / len2))
+              : 0;
+          d = Math.max(d, hw - Math.hypot(x - ax - t * dx, z - az - t * dz));
+        }
+        return d;
+      }
+
+      function isPlayerInside(x, z) {
+        return colonySDF(x, z, _activeChambers, _activeTunnels) > 1.5;
+      }
+
+      function buildFloorGroup(chambers, tunnels) {
+        const group = new THREE.Group();
+        const mat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+        chambers.forEach(([cx, cz, r]) => {
+          const mesh = new THREE.Mesh(new THREE.CircleGeometry(r, 64), mat);
+          mesh.rotation.x = -Math.PI / 2;
+          mesh.position.set(cx, 0, cz);
+          group.add(mesh);
+        });
+        tunnels.forEach(([a, b, hw]) => {
+          const p1 = chambers[a],
+            p2 = chambers[b];
+          if (!p1 || !p2) return;
+          const dx = p2[0] - p1[0],
+            dz = p2[1] - p1[1],
+            dist = Math.hypot(dx, dz),
+            angle = Math.atan2(dz, dx);
+          const mesh = new THREE.Mesh(
+            new THREE.PlaneGeometry(dist, hw * 2),
+            mat,
+          );
+          mesh.rotation.x = -Math.PI / 2;
+          const pivot = new THREE.Group();
+          pivot.position.set((p1[0] + p2[0]) / 2, 0, (p1[1] + p2[1]) / 2);
+          pivot.rotation.y = -angle;
+          pivot.add(mesh);
+          group.add(pivot);
+        });
+        group.position.y = -0.1;
+        return group;
+      }
+
+      function init() {
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xcccccc);
+        const aspect = window.innerWidth / window.innerHeight,
+          d = 50;
+        camera = new THREE.OrthographicCamera(
+          -d * aspect,
+          d * aspect,
+          d,
+          -d,
+          1,
+          10000,
+        );
+        camera.position.set(0, 150, 0);
+        camera.lookAt(0, 0, 0);
+        player = new THREE.Mesh(
+          new THREE.CircleGeometry(0.99 * S, 32),
+          new THREE.MeshBasicMaterial({ color: 0x000000 }),
+        );
+        player.rotation.x = -Math.PI / 2;
+        player.position.y = 0.5;
+        player.visible = false;
+        scene.add(player);
+        renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        document.body.appendChild(renderer.domElement);
+        window.addEventListener('resize', onWindowResize);
+        window.addEventListener('keydown', onKeyDown);
+        window.addEventListener('keyup', onKeyUp);
+        window.addEventListener('mousedown', onMouseDown);
+        window.addEventListener('mousemove', onMouseMove);
+        window.addEventListener('mouseup', onMouseUp);
+        fetchData();
+        animate();
+      }
+
+      function onKeyDown(e) {
+        if (e.key in moveKeys) {
+          moveKeys[e.key] = true;
+          isInteractionPaused = false;
+        }
+        if (e.key.toLowerCase() === 'k') comboKeys.k = true;
+        if (e.key === 'Enter') comboKeys.enter = true;
+        if (e.key === 'Shift') moveKeys.Shift = true;
+        if (comboKeys.k && comboKeys.enter) {
+          isAdminMode = !isAdminMode;
+          document.getElementById('admin-status').style.display = isAdminMode
+            ? 'block'
+            : 'none';
+          if (!isAdminMode) {
+            camera.zoom = 1.0;
+            camera.updateProjectionMatrix();
+            selectedNodes = [];
+            document.getElementById('link-list-panel').style.display = 'none';
+          }
+          comboKeys.k = comboKeys.enter = false;
+        }
+        if (isAdminMode && e.key.toLowerCase() === 'l') {
+          const panel = document.getElementById('link-list-panel');
+          panel.style.display =
+            panel.style.display === 'block' ? 'none' : 'block';
+          if (panel.style.display === 'block') updateLinkListUI();
+        }
+      }
+
+      function onKeyUp(e) {
+        if (e.key in moveKeys) moveKeys[e.key] = false;
+        if (e.key.toLowerCase() === 'k') comboKeys.k = false;
+        if (e.key === 'Enter') comboKeys.enter = false;
+        if (e.key === 'Shift') moveKeys.Shift = false;
+      }
+
+      function onMouseDown(e) {
+        if (!isAdminMode) return;
+        mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+        mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+        raycaster.setFromCamera(mouse, camera);
+        if (e.shiftKey) {
+          isSelecting = true;
+          selectionStart.set(e.clientX, e.clientY);
+          const rect = document.getElementById('selection-rect');
+          rect.style.display = 'block';
+          rect.style.left = e.clientX + 'px';
+          rect.style.top = e.clientY + 'px';
+          rect.style.width = '0px';
+          rect.style.height = '0px';
+          selectedNodes = [];
+          return;
+        }
+        const intersects = raycaster.intersectObjects(activeNodes);
+        if (intersects.length > 0) {
+          draggedNode = intersects[0].object;
+          if (!selectedNodes.includes(draggedNode))
+            selectedNodes = [draggedNode];
+          const vector = new THREE.Vector3(mouse.x, mouse.y, 0.5).unproject(
+            camera,
+          );
+          dragStartWorld.copy(vector);
+          selectedNodes.forEach(
+            (n) => (n.userData.startPos = n.position.clone()),
+          );
+        } else {
+          selectedNodes = [];
+        }
+      }
+
+      function onMouseMove(e) {
+        mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+        mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+        if (isAdminMode) {
+          if (isSelecting) {
+            const rect = document.getElementById('selection-rect');
+            rect.style.left = Math.min(selectionStart.x, e.clientX) + 'px';
+            rect.style.top = Math.min(selectionStart.y, e.clientY) + 'px';
+            rect.style.width = Math.abs(selectionStart.x - e.clientX) + 'px';
+            rect.style.height = Math.abs(selectionStart.y - e.clientY) + 'px';
+            return;
+          }
+          if (draggedNode) {
+            raycaster.setFromCamera(mouse, camera);
+            const vector = new THREE.Vector3(mouse.x, mouse.y, 0.5).unproject(
+              camera,
+            );
+            const delta = vector.clone().sub(dragStartWorld);
+            selectedNodes.forEach((n) => {
+              n.position.x = n.userData.startPos.x + delta.x;
+              n.position.z = n.userData.startPos.z + delta.z;
+            });
+          }
+          const m = 50;
+          mouseEdge.left = e.clientX < m;
+          mouseEdge.right = e.clientX > window.innerWidth - m;
+          mouseEdge.up = e.clientY < m;
+          mouseEdge.down = e.clientY > window.innerHeight - m;
+        }
+      }
+
+      function onMouseUp() {
+        if (!isAdminMode) return;
+        if (isSelecting) {
+          isSelecting = false;
+          const rect = document.getElementById('selection-rect');
+          const r = rect.getBoundingClientRect();
+          rect.style.display = 'none';
+          activeNodes.forEach((n) => {
+            if (n.userData.isPortal) return;
+            const p = n.position.clone().project(camera);
+            const x = ((p.x + 1) * window.innerWidth) / 2,
+              y = ((-p.y + 1) * window.innerHeight) / 2;
+            if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom)
+              selectedNodes.push(n);
+          });
+          return;
+        }
+        if (selectedNodes.length > 0) {
+          selectedNodes.forEach((n) => {
+            const key = n.userData.isPortal
+              ? `portal:${n.userData.dest}`
+              : n.userData.url;
+            savedPositions[key] = [
+              Math.round(n.position.x),
+              Math.round(n.position.z),
+            ];
+          });
+          localStorage.setItem(
+            'archive_fixed_pos',
+            JSON.stringify(savedPositions),
+          );
+        }
+        draggedNode = null;
+      }
+
+      function updateLinkListUI() {
+        const container = document.getElementById('link-items-container');
+        container.innerHTML = '';
+        const sorted = activeNodes
+          .filter((n) => !n.userData.isPortal)
+          .sort((a, b) => a.userData.title.localeCompare(b.userData.title));
+        document.getElementById('node-count').textContent =
+          `(${sorted.length})`;
+        sorted.forEach((n, i) => {
+          const item = document.createElement('div');
+          item.className = 'link-item';
+          item.innerHTML = `<div class="link-item-header"><span>${i + 1}.</span> ${n.userData.title}</div><div class="link-item-url">${n.userData.url}</div>`;
+          item.onclick = () => {
+            player.position.set(n.position.x, 0.5, n.position.z);
+            camera.position.set(n.position.x, 150, n.position.z);
+          };
+          container.appendChild(item);
+        });
+      }
+
+      function onWindowResize() {
+        const aspect = window.innerWidth / window.innerHeight,
+          d = 50;
+        camera.left = -d * aspect;
+        camera.right = d * aspect;
+        camera.top = d;
+        camera.bottom = -d;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      }
+
+      function toSentenceCase(str) {
+        if (!str) return '';
+        const s = str.toLowerCase();
+        return s.charAt(0).toUpperCase() + s.slice(1);
+      }
+
+      async function fetchData() {
+        try {
+          const URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${GID}&t=${Date.now()}`;
+          const res = await fetch(URL, {
+            cache: 'no-store',
+            headers: { pragma: 'no-cache', 'cache-control': 'no-cache' },
+          });
+          const csv = await res.text();
+          let rows = parseCSV(csv);
+          rows = rows.filter(
+            (r) => r.length > 1 || (r[0] && r[0].trim() !== ''),
+          );
+          rows.shift();
+
+          const total = rows.length;
+          const fillEl = document.getElementById('digging-fill');
+          const overlayEl = document.getElementById('intro-overlay');
+          const layerEl = document.getElementById('labels-layer');
+          let chamberUsageMain = new Array(rawMainChambers.length).fill(0);
+          let chamberUsageMap = new Array(rawMapChambers.length).fill(0);
+          let categoryCounts = {};
+
+          for (let i = 0; i < total; i++) {
+            const c = rows[i];
+            const rawUrl = (c[0] || '').trim();
+            if (!rawUrl) continue;
+            const url = rawUrl.startsWith('http')
+              ? rawUrl
+              : 'https://' + rawUrl;
+            const title = url
+              .replace(/^(https?:\/\/)?(www\.)?/, '')
+              .split(/[/?#:]/)[0];
+            const rawCat = (c[1] || '').trim().toLowerCase();
+            const isMap = /\bmap\b/.test(rawCat);
+            const meta = (c[2] || '').replace(/"/g, '').trim();
+            const sum = (c[3] || '').replace(/"/g, '').trim();
+
+            /* DOM 라벨 생성 */
+            const el = document.createElement('div');
+            el.className = 'node-label';
+            el.innerHTML =
+              `<div class="node-meta">${toSentenceCase(meta)}</div>` +
+              `<div class="node-title">${title}</div>` +
+              `<div class="node-cat">${toSentenceCase(rawCat)}</div>` +
+              `<div class="node-sum">${toSentenceCase(sum)}</div>`;
+            layerEl.appendChild(el);
+            const rect = el.getBoundingClientRect();
+            const w_world = rect.width / 10;
+            const h_world = rect.height / 10;
+
+            let x,
+              z,
+              placed = false;
+            if (savedPositions[url]) {
+              x = savedPositions[url][0];
+              z = savedPositions[url][1];
+              placed = true;
+            } else {
+              const sr = mulberry32(getSeedFromStr(url));
+              let tx = 0,
+                tz = 0,
+                bd = 0;
+              if (!isMap) {
+                let dx = 0,
+                  dz = 0;
+                const count = [
+                  /\bsound\b/.test(rawCat),
+                  /\bsubculture\b/.test(rawCat),
+                  /\boutdoor\b/.test(rawCat),
+                ].filter(Boolean).length;
+                if (count > 0) {
+                  if (/\bsound\b/.test(rawCat)) dx -= 1;
+                  if (/\bsubculture\b/.test(rawCat)) dx += 1;
+                  if (/\boutdoor\b/.test(rawCat)) dz += 1;
+                  const len = Math.hypot(dx, dz) || 1;
+                  dx /= len;
+                  dz /= len;
+                  bd = count === 1 ? 600 : 250;
+                  tx = dx * bd;
+                  tz = dz * bd;
+                } else {
+                  bd = 50;
+                }
+              }
+              const key = isMap ? 'map' : `${Math.round(tx)}_${Math.round(tz)}`;
+              if (!categoryCounts[key]) categoryCounts[key] = 1;
+              const chambers = isMap ? rawMapChambers : rawMainChambers;
+              const tunnels = isMap ? rawMapTunnels : rawMainTunnels;
+              const nodes = isMap ? mapWorldNodes : mainWorldNodes;
+              const sdfThresholds = [16, 8, 2, -10, -30];
+              outer: for (const sdfMin of sdfThresholds) {
+                const maxAtt = sdfMin > 0 ? 1000 : 500;
+                for (let t = 0; t < maxAtt; t++) {
+                  const n = categoryCounts[key];
+                  const ang = n * 2.39996 + sr() * 0.5;
+                  const lr = (isMap ? 55 : 40) * Math.sqrt(n);
+                  x = tx + Math.cos(ang) * lr;
+                  z = tz + Math.sin(ang) * lr;
+                  if (colonySDF(x, z, chambers, tunnels) > sdfMin) {
+                    let overlap = false;
+                    for (const nd of nodes) {
+                      if (
+                        Math.abs(x - nd.position.x) <
+                          (w_world + nd.userData.w_world) / 2 + 2 &&
+                        Math.abs(z - nd.position.z) <
+                          (h_world + nd.userData.h_world) / 2 + 2
+                      ) {
+                        overlap = true;
+                        break;
+                      }
+                    }
+                    if (!overlap) {
+                      categoryCounts[key]++;
+                      placed = true;
+                      break outer;
+                    }
+                  }
+                  categoryCounts[key]++;
+                }
+              }
+              if (!placed) {
+                x = tx + (sr() - 0.5) * 75;
+                z = tz + (sr() - 0.5) * 75;
+                placed = true;
+              }
+            }
+
+            if (placed) {
+              const geo = new THREE.PlaneGeometry(w_world, h_world);
+              const mat = new THREE.MeshBasicMaterial({
+                transparent: true,
+                opacity: 0,
+              });
+              const b = new THREE.Mesh(geo, mat);
+              b.position.set(x, 0.2, z);
+              b.rotation.x = -Math.PI / 2;
+              b.userData = {
+                url,
+                title,
+                targetScale: 1,
+                currentScale: 1,
+                targetOpacity: 1,
+                currentOpacity: 1,
+                isPortal: false,
+                domElement: el,
+                w_world,
+                h_world,
+              };
+              if (isMap) {
+                b.visible = false;
+                el.style.display = 'none';
+              }
+              scene.add(b);
+              (isMap ? mapWorldNodes : mainWorldNodes).push(b);
+              const usage = isMap ? chamberUsageMap : chamberUsageMain;
+              const chams = isMap ? rawMapChambers : rawMainChambers;
+              chams.forEach((ch, idx) => {
+                if (Math.hypot(x - ch[0], z - ch[1]) < ch[2] + 40) usage[idx]++;
+              });
+            }
+
+            fillEl.style.width = (i / total) * 100 + '%';
+            if (i % 10 === 0) await new Promise((res) => setTimeout(res, 1));
+          }
+
+          finalizeWorld(chamberUsageMain, chamberUsageMap);
+          createPortals();
+          setTimeout(() => {
+            overlayEl.style.opacity = '0';
+            overlayEl.style.visibility = 'hidden';
+            layerEl.style.opacity = '1';
+            isLoaded = true;
+          }, 800);
+        } catch (e) {
+          console.error(e);
+        }
+      }
+
+      function finalizeWorld(um, umap) {
+        um[0] = um[5] = 1;
+        umap[0] = 1;
+        const build = (idx, rc, rt) => {
+          const c = idx.map((i) => rc[i]),
+            m = {};
+          idx.forEach((o, n) => (m[o] = n));
+          const t = rt
+            .filter(([a, b]) => idx.includes(a) && idx.includes(b))
+            .map(([a, b, hw]) => [m[a], m[b], hw]);
+          return { c, t };
+        };
+        const midx = um.map((u, i) => (u > 0 ? i : -1)).filter((i) => i !== -1);
+        const mapidx = umap
+          .map((u, i) => (u > 0 ? i : -1))
+          .filter((i) => i !== -1);
+        _mainConfig = build(midx, rawMainChambers, rawMainTunnels);
+        _mapConfig = build(mapidx, rawMapChambers, rawMapTunnels);
+        _activeChambers = _mainConfig.c;
+        _activeTunnels = _mainConfig.t;
+        mainFloorGroup = buildFloorGroup(_mainConfig.c, _mainConfig.t);
+        scene.add(mainFloorGroup);
+        mapFloorGroup = buildFloorGroup(_mapConfig.c, _mapConfig.t);
+        mapFloorGroup.visible = false;
+        scene.add(mapFloorGroup);
+      }
+
+      function createPortals() {
+        const makePortal = (savedKey, defaultPos, dest, hidden) => {
+          const saved = savedPositions[savedKey];
+          const mesh = new THREE.Mesh(
+            new THREE.CircleGeometry(5 * S, 32),
+            new THREE.MeshBasicMaterial({ opacity: 0, transparent: true }),
+          );
+          mesh.rotation.x = -Math.PI / 2;
+          mesh.position.set(
+            saved ? saved[0] : defaultPos[0],
+            0.1,
+            saved ? saved[1] : defaultPos[1],
+          );
+          const el = document.createElement('div');
+          el.className = 'portal-node';
+          document.getElementById('labels-layer').appendChild(el);
+          mesh.userData = {
+            isPortal: true,
+            dest,
+            targetScale: 1.0,
+            currentScale: 1.0,
+            targetOpacity: 0.5,
+            currentOpacity: 0.5,
+            domElement: el,
+          };
+          if (hidden) {
+            mesh.visible = false;
+            el.style.display = 'none';
+          }
+          scene.add(mesh);
+          return mesh;
+        };
+        const p1 = makePortal(
+          'portal:map',
+          [rawMainChambers[5][0], rawMainChambers[5][1]],
+          'map',
+          false,
+        );
+        mainWorldNodes.push(p1);
+        const p2 = makePortal('portal:main', [0, 0], 'main', true);
+        mapWorldNodes.push(p2);
+      }
+
+      function drawProgress(r) {
+        const ring = document.querySelector('#progress-ring circle');
+        ring.style.strokeDashoffset = 283 * (1 - r);
+        document.getElementById('progress-ring').style.opacity =
+          r > 0 ? '1' : '0';
+      }
+
+      function drawMinimap() {
+        const ms = 200,
+          co = ms / 2;
+        const sc = ms / (activeNodes === mapWorldNodes ? 1400 : 3000);
+        minimapCtx.clearRect(0, 0, ms, ms);
+        minimapCtx.save();
+        minimapCtx.translate(co, co);
+        minimapCtx.scale(sc, sc);
+        minimapCtx.translate(-player.position.x, -player.position.z);
+        minimapCtx.fillStyle = '#ffffff';
+        minimapCtx.strokeStyle = '#ffffff';
+        for (const [a, b, hw] of _activeTunnels) {
+          if (!_activeChambers[a] || !_activeChambers[b]) continue;
+          minimapCtx.lineWidth = hw * 2;
+          minimapCtx.lineCap = 'round';
+          minimapCtx.beginPath();
+          minimapCtx.moveTo(_activeChambers[a][0], _activeChambers[a][1]);
+          minimapCtx.lineTo(_activeChambers[b][0], _activeChambers[b][1]);
+          minimapCtx.stroke();
+        }
+        for (const [cx, cz, r] of _activeChambers) {
+          minimapCtx.beginPath();
+          minimapCtx.arc(cx, cz, r, 0, Math.PI * 2);
+          minimapCtx.fill();
+        }
+        activeNodes.forEach((n) => {
+          if (n.userData.isPortal) {
+            minimapCtx.fillStyle = '#ff0000';
+            minimapCtx.fillRect(n.position.x - 15, n.position.z - 15, 30, 30);
+          } else {
+            minimapCtx.fillStyle = selectedNodes.includes(n)
+              ? '#ff0000'
+              : '#000000';
+            minimapCtx.fillRect(n.position.x - 5, n.position.z - 5, 10, 10);
+          }
+        });
+        minimapCtx.restore();
+        minimapCtx.fillStyle = '#ff0000';
+        minimapCtx.fillRect(co - 3, co - 3, 6, 6);
+      }
+
+      function switchWorld(dest) {
+        activeNodes.forEach((n) => {
+          n.visible = false;
+          if (n.userData.domElement)
+            n.userData.domElement.style.display = 'none';
+        });
+        if (dest === 'map') {
+          activeNodes = mapWorldNodes;
+          mainFloorGroup.visible = false;
+          mapFloorGroup.visible = true;
+          _activeChambers = _mapConfig.c;
+          _activeTunnels = _mapConfig.t;
+        } else {
+          activeNodes = mainWorldNodes;
+          mainFloorGroup.visible = true;
+          mapFloorGroup.visible = false;
+          _activeChambers = _mainConfig.c;
+          _activeTunnels = _mainConfig.t;
+        }
+        activeNodes.forEach((n) => {
+          n.visible = true;
+        });
+        player.position.set(0, 0.5, 0);
+        camera.position.set(0, 150, 0);
+        if (
+          document.getElementById('link-list-panel').style.display === 'block'
+        )
+          updateLinkListUI();
+      }
+
+      function animate() {
+        requestAnimationFrame(animate);
+        if (!isLoaded) return;
+        const s = 1.25;
+        let nx = player.position.x,
+          nz = player.position.z,
+          moved = false;
+        if (moveKeys.ArrowUp) {
+          nz -= s;
+          moved = true;
+        }
+        if (moveKeys.ArrowDown) {
+          nz += s;
+          moved = true;
+        }
+        if (moveKeys.ArrowLeft) {
+          nx -= s;
+          moved = true;
+        }
+        if (moveKeys.ArrowRight) {
+          nx += s;
+          moved = true;
+        }
+        if (isAdminMode) {
+          if (mouseEdge.up) {
+            nz -= s;
+            moved = true;
+          }
+          if (mouseEdge.down) {
+            nz += s;
+            moved = true;
+          }
+          if (mouseEdge.left) {
+            nx -= s;
+            moved = true;
+          }
+          if (mouseEdge.right) {
+            nx += s;
+            moved = true;
+          }
+          if (moveKeys['[']) {
+            camera.zoom = Math.max(0.05, camera.zoom - 0.02);
+            camera.updateProjectionMatrix();
+          }
+          if (moveKeys[']']) {
+            camera.zoom = Math.min(5.0, camera.zoom + 0.02);
+            camera.updateProjectionMatrix();
+          }
+        }
+        if (moved) {
+          if (isPlayerInside(nx, nz)) {
+            player.position.x = nx;
+            player.position.z = nz;
+          } else if (isPlayerInside(nx, player.position.z)) {
+            player.position.x = nx;
+          } else if (isPlayerInside(player.position.x, nz)) {
+            player.position.z = nz;
+          }
+        }
+        camera.position.set(player.position.x, 150, player.position.z);
+        if (!isAdminMode) updateInteraction();
+
+        const ppu = (window.innerHeight / 100) * camera.zoom;
+        const scaleBase = ppu / 10;
+        const pd = document.getElementById('player-dot');
+        pd.style.width = pd.style.height = 0.99 * ppu + 'px';
+        const pr = document.getElementById('progress-ring');
+        pr.style.width = pr.style.height = 1.98 * ppu + 'px';
+
+        activeNodes.forEach((n) => {
+          const u = n.userData;
+          if (
+            Math.abs(u.targetScale - u.currentScale) > 0.001 ||
+            Math.abs(u.targetOpacity - u.currentOpacity) > 0.001
+          ) {
+            u.currentScale += (u.targetScale - u.currentScale) * 0.15;
+            u.currentOpacity += (u.targetOpacity - u.currentOpacity) * 0.15;
+            if (u.isPortal) n.scale.set(u.currentScale, u.currentScale, 1);
+          }
+          if (u.domElement) {
+            if (n.visible) {
+              u.domElement.style.display = u.isPortal ? 'block' : 'flex';
+              const pos = n.position.clone().project(camera);
+              const sx = (pos.x * 0.5 + 0.5) * window.innerWidth;
+              const sy = (-pos.y * 0.5 + 0.5) * window.innerHeight;
+              if (u.isPortal) {
+                const size = 5 * ppu * u.currentScale;
+                u.domElement.style.width = u.domElement.style.height =
+                  size + 'px';
+                u.domElement.style.transform = `translate3d(${sx}px,${sy}px,0) translate(-50%,-50%)`;
+                u.domElement.style.opacity = u.currentOpacity;
+              } else {
+                const fs = scaleBase * u.currentScale;
+                u.domElement.style.transform = `translate3d(${sx}px,${sy}px,0) translate(-50%,-50%) scale(${fs})`;
+                u.domElement.style.opacity = u.currentOpacity;
+              }
+            } else {
+              u.domElement.style.display = 'none';
+            }
+          }
+        });
+        drawMinimap();
+        renderer.render(scene, camera);
+      }
+
+      function updateInteraction() {
+        let target = null;
+        for (const n of activeNodes) {
+          if (
+            player.position.distanceTo(n.position) <
+            (n.userData.isPortal ? 7 : 9)
+          ) {
+            target = n;
+            break;
+          }
+        }
+        if (!target || isInteractionPaused) {
+          if (currentTarget) {
+            currentTarget.userData.targetScale = 1.0;
+            currentTarget.userData.targetOpacity = currentTarget.userData
+              .isPortal
+              ? 0.5
+              : 1.0;
+            currentTarget = null;
+          }
+          stayStartTime = null;
+          drawProgress(0);
+          return;
+        }
+        const now = Date.now();
+        if (!stayStartTime) {
+          stayStartTime = now;
+          currentTarget = target;
+        }
+        const ratio = Math.min((now - stayStartTime) / 3000, 1.0);
+        drawProgress(ratio);
+        if (currentTarget) {
+          if (currentTarget.userData.isPortal)
+            currentTarget.userData.targetOpacity = 0.5 - 0.25 * ratio;
+          else {
+            currentTarget.userData.targetScale = 1.1;
+            currentTarget.userData.targetOpacity = 1.0 - 0.5 * ratio;
+          }
+        }
+        if (ratio >= 1.0) {
+          if (currentTarget.userData.isPortal)
+            switchWorld(currentTarget.userData.dest);
+          else window.open(currentTarget.userData.url, '_blank');
+          stayStartTime = null;
+          currentTarget = null;
+          drawProgress(0);
+          isInteractionPaused = true;
+        }
+      }
+
+      init();
+    </script>
+  </body>
+</html>
