@@ -295,6 +295,8 @@
       const SHEET_ID = '19uD7rBe4Ic6nIR-0LJ2anEdeWTZKbR9WlcT-g8wzGx4';
       const GID = '729859851';
       const S = 0.5;
+      const MAP_RX = 400 * S; // 사운드 방 가로 반지름 (200 world units)
+      const MAP_RZ = 180 * S; // 사운드 방 세로 반지름 (90 world units)
 
       function mulberry32(a) {
         return function () {
@@ -418,38 +420,15 @@
         [1, 14, 36 * S],
         [14, 15, 28 * S],
       ];
+      // 사운드 방: 노드 배치용 (가로로 퍼진 3개 챔버 — 시각은 타원으로 override)
       const rawMapChambers = [
-        [0 * S, 0 * S, 220 * S],
-        [-320 * S, -240 * S, 160 * S],
-        [350 * S, -200 * S, 150 * S],
-        [0 * S, 380 * S, 160 * S],
-        [-480 * S, 80 * S, 130 * S],
-        [480 * S, 120 * S, 130 * S],
-        [-160 * S, -520 * S, 130 * S],
-        [220 * S, -500 * S, 120 * S],
-        [-520 * S, -280 * S, 110 * S],
-        [400 * S, 380 * S, 110 * S],
-        [-200 * S, 550 * S, 100 * S],
-        [200 * S, 560 * S, 100 * S],
+        [0, 0, 140 * S], // 중앙
+        [-220 * S, 0, 100 * S], // 왼쪽
+        [220 * S, 0, 100 * S], // 오른쪽
       ];
       const rawMapTunnels = [
-        [0, 1, 55 * S],
-        [0, 2, 50 * S],
-        [0, 3, 55 * S],
-        [0, 4, 50 * S],
-        [0, 5, 48 * S],
-        [1, 4, 44 * S],
-        [1, 6, 42 * S],
-        [1, 8, 38 * S],
-        [2, 5, 44 * S],
-        [2, 7, 40 * S],
-        [3, 9, 40 * S],
-        [3, 10, 38 * S],
-        [3, 11, 38 * S],
-        [6, 7, 36 * S],
-        [8, 6, 34 * S],
-        [9, 5, 36 * S],
-        [10, 11, 34 * S],
+        [1, 0, 100 * S],
+        [0, 2, 100 * S],
       ];
 
       let _activeChambers = [],
@@ -482,7 +461,68 @@
       }
 
       function isPlayerInside(x, z) {
+        if (activeNodes === mapWorldNodes) {
+          // 타원형 사운드 방 collision
+          return (
+            (x / MAP_RX) * (x / MAP_RX) + (z / MAP_RZ) * (z / MAP_RZ) < 0.97
+          );
+        }
         return colonySDF(x, z, _activeChambers, _activeTunnels) > 1.5;
+      }
+
+      function buildEllipseFloorGroup(rx, rz) {
+        const group = new THREE.Group();
+
+        // 타원 바닥
+        const SEG = 128;
+        const pos = [],
+          idx = [];
+        pos.push(0, 0, 0);
+        for (let i = 0; i < SEG; i++) {
+          const ang = (i / SEG) * Math.PI * 2;
+          pos.push(Math.cos(ang) * rx, 0, Math.sin(ang) * rz);
+        }
+        for (let i = 0; i < SEG; i++) idx.push(0, i + 1, ((i + 1) % SEG) + 1);
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+        geo.setIndex(idx);
+        group.add(
+          new THREE.Mesh(
+            geo,
+            new THREE.MeshBasicMaterial({
+              color: 0xffffff,
+              side: THREE.DoubleSide,
+            }),
+          ),
+        );
+
+        // 바닥 텍스트: "Welcome to Listening chamber"
+        const cv = document.createElement('canvas');
+        cv.width = 4096;
+        cv.height = 384;
+        const ctx = cv.getContext('2d');
+        ctx.font = '400 160pt Georgia';
+        ctx.fillStyle = '#000000';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('Welcome to Listening chamber', 2048, 192);
+        const tex = new THREE.CanvasTexture(cv);
+        tex.minFilter = THREE.LinearFilter;
+        const tW = rx * 1.75,
+          tH = tW * (384 / 4096);
+        const tGeo = new THREE.PlaneGeometry(tW, tH);
+        const tMat = new THREE.MeshBasicMaterial({
+          map: tex,
+          transparent: true,
+          opacity: 0.3,
+        });
+        const tMesh = new THREE.Mesh(tGeo, tMat);
+        tMesh.rotation.x = -Math.PI / 2;
+        tMesh.position.y = 0.05;
+        group.add(tMesh);
+
+        group.position.y = -0.1;
+        return group;
       }
 
       function buildFloorGroup(chambers, tunnels) {
@@ -842,8 +882,7 @@
               .split(/[/?#:]/)[0];
             const rawCat = (c[1] || '').trim().toLowerCase();
             // ── 변경: sound 카테고리 → 포털 공간, map 포함 나머지 → 메인 맵 ──
-            const isMap =
-              /\bsound\b/.test(rawCat) && !/aporee|khinsider/i.test(url);
+            const isMap = /\bsound\b/.test(rawCat) && !/aporee/i.test(url);
             const meta = (c[2] || '').replace(/"/g, '').trim();
             const sum = (c[3] || '').replace(/"/g, '').trim();
 
@@ -1008,7 +1047,7 @@
         _activeTunnels = _mainConfig.t;
         mainFloorGroup = buildFloorGroup(_mainConfig.c, _mainConfig.t);
         scene.add(mainFloorGroup);
-        mapFloorGroup = buildFloorGroup(_mapConfig.c, _mapConfig.t);
+        mapFloorGroup = buildEllipseFloorGroup(MAP_RX, MAP_RZ);
         mapFloorGroup.visible = false;
         scene.add(mapFloorGroup);
       }
@@ -1199,7 +1238,7 @@
         const ppu = (window.innerHeight / 100) * camera.zoom;
         const scaleBase = ppu / 10;
         const pd = document.getElementById('player-dot');
-        pd.style.width = pd.style.height = 0.99 * ppu + 'px';
+        pd.style.width = pd.style.height = 0.99 * 3 * ppu + 'px';
         const pr = document.getElementById('progress-ring');
         pr.style.width = pr.style.height = 1.98 * ppu + 'px';
 
