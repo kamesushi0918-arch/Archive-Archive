@@ -267,7 +267,8 @@
     </div>
     <div id="ui-layer">Use arrow keys to move and stay to open</div>
     <div id="admin-status">
-      ADMIN MODE ACTIVE (Shift+Drag: Select / L: List / Drag: Move)
+      ADMIN MODE ACTIVE (Shift+Click/Drag: Select · Drag: Move · L: List · E:
+      Export · I: Import)
     </div>
     <div id="selection-rect"></div>
     <div id="link-list-panel">
@@ -574,6 +575,52 @@
           }
           comboKeys.k = comboKeys.enter = false;
         }
+        if (isAdminMode && e.key.toLowerCase() === 'e') {
+          // 위치 내보내기: 클립보드 복사 + 파일 다운로드
+          const json = JSON.stringify(savedPositions, null, 2);
+          const blob = new Blob([json], { type: 'application/json' });
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(blob);
+          a.download = 'archive_positions.json';
+          a.click();
+          navigator.clipboard.writeText(json).catch(() => {});
+        }
+        if (isAdminMode && e.key.toLowerCase() === 'i') {
+          // 위치 불러오기: 파일 선택
+          const input = document.createElement('input');
+          input.type = 'file';
+          input.accept = '.json,application/json';
+          input.onchange = (ev) => {
+            const file = ev.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (re) => {
+              try {
+                const imported = JSON.parse(re.result);
+                savedPositions = { ...savedPositions, ...imported };
+                localStorage.setItem(
+                  'archive_fixed_pos',
+                  JSON.stringify(savedPositions),
+                );
+                // 이미 배치된 노드 위치 즉시 반영
+                activeNodes.forEach((n) => {
+                  const key = n.userData.isPortal
+                    ? `portal:${n.userData.dest}`
+                    : n.userData.url;
+                  if (savedPositions[key]) {
+                    n.position.x = savedPositions[key][0];
+                    n.position.z = savedPositions[key][1];
+                  }
+                });
+                alert('✓ 위치를 불러왔습니다.');
+              } catch (err) {
+                alert('JSON 파싱 오류: ' + err.message);
+              }
+            };
+            reader.readAsText(file);
+          };
+          input.click();
+        }
         if (isAdminMode && e.key.toLowerCase() === 'l') {
           const panel = document.getElementById('link-list-panel');
           panel.style.display =
@@ -795,7 +842,8 @@
               .split(/[/?#:]/)[0];
             const rawCat = (c[1] || '').trim().toLowerCase();
             // ── 변경: sound 카테고리 → 포털 공간, map 포함 나머지 → 메인 맵 ──
-            const isMap = /\bsound\b/.test(rawCat);
+            const isMap =
+              /\bsound\b/.test(rawCat) && !/aporee|khinsider/i.test(url);
             const meta = (c[2] || '').replace(/"/g, '').trim();
             const sum = (c[3] || '').replace(/"/g, '').trim();
 
