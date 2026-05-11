@@ -779,8 +779,8 @@
           const fillEl = document.getElementById('digging-fill');
           const overlayEl = document.getElementById('intro-overlay');
           const layerEl = document.getElementById('labels-layer');
-          let chamberUsageMain = new Array(rawMainChambers.length).fill(0);
-          let chamberUsageMap = new Array(rawMapChambers.length).fill(0);
+          let chamberUsageMain = new Array(rawMainChambers.length).fill(1); // 모든 챔버 항상 활성화
+          let chamberUsageMap = new Array(rawMapChambers.length).fill(1);
           let categoryCounts = {};
 
           for (let i = 0; i < total; i++) {
