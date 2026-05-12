@@ -35,7 +35,7 @@
       }
       #digging-container {
         position: relative;
-        font-size: 18pt;
+        font-size: 54pt;
         font-weight: 400;
       }
       #digging-fill {
@@ -166,7 +166,7 @@
         padding: 0;
         display: flex;
         flex-direction: column;
-        gap: 0; /* 개별 margin-bottom으로 각각 조절 */
+        gap: 0;
         will-change: transform, opacity;
         pointer-events: none;
         font-family: 'Georgia', serif;
@@ -182,7 +182,7 @@
         font-weight: 400;
         font-style: normal;
         line-height: 1.35;
-        margin-bottom: -3px; /* ← meta 아래 간격 */
+        margin-bottom: -3px;
       }
 
       .node-title {
@@ -190,7 +190,7 @@
         color: #000000;
         font-weight: 400;
         line-height: 1.35;
-        margin-bottom: 2px; /* ← title 아래 간격 */
+        margin-bottom: 2px;
       }
 
       .node-cat {
@@ -199,7 +199,7 @@
         font-weight: 400;
         font-style: normal;
         line-height: 1.35;
-        margin-bottom: 2px; /* ← cat 아래 간격 */
+        margin-bottom: 2px;
       }
 
       .node-sum {
@@ -210,13 +210,30 @@
         line-height: 1.35;
         white-space: normal;
         max-width: 480px;
-        margin-bottom: 0; /* ← summary 아래 간격 */
+        margin-bottom: 0;
       }
 
       /* ── 선택된 노드 강조 ── */
       .node-label.selected {
         outline: 1.5px solid red;
         outline-offset: 4px;
+      }
+
+      /* ── Onepiece 블록 ── */
+      .onepiece-block {
+        position: absolute;
+        top: 0;
+        left: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-sizing: border-box;
+        border: 4px solid;
+        font-family: 'Georgia', serif;
+        font-weight: 700;
+        will-change: transform;
+        pointer-events: none;
+        white-space: nowrap;
       }
 
       /* ── 포털 ── */
@@ -295,8 +312,8 @@
       const SHEET_ID = '19uD7rBe4Ic6nIR-0LJ2anEdeWTZKbR9WlcT-g8wzGx4';
       const GID = '729859851';
       const S = 0.5;
-      const MAP_RX = 400 * S; // 사운드 방 가로 반지름 (200 world units)
-      const MAP_RZ = 180 * S; // 사운드 방 세로 반지름 (90 world units)
+      const MAP_RX = 400 * S;
+      const MAP_RZ = 180 * S;
 
       function mulberry32(a) {
         return function () {
@@ -387,21 +404,20 @@
 
       const rawMainChambers = [
         [0 * S, 0 * S, 230 * S],
-        [-100 * S, -700 * S, 160 * S],
+        [-100 * S, -700 * S, 160 * S], // 0, 1
         [-200 * S, -1150 * S, 130 * S],
-        [200 * S, -1050 * S, 100 * S],
+        [200 * S, -1050 * S, 100 * S], // 2, 3
         [100 * S, 800 * S, 140 * S],
-        [60 * S, 1250 * S, 110 * S],
+        [60 * S, 1250 * S, 110 * S], // 4, 5 (portal)
         [-700 * S, 100 * S, 180 * S],
-        [-1200 * S, -60 * S, 150 * S],
+        [-1200 * S, -60 * S, 150 * S], // 6, 7
         [-1550 * S, 180 * S, 110 * S],
-        [900 * S, -100 * S, 170 * S],
+        [900 * S, -100 * S, 170 * S], // 8, 9
         [1400 * S, 50 * S, 145 * S],
-        [1750 * S, -130 * S, 100 * S],
-        [-480 * S, 520 * S, 100 * S],
-        [-900 * S, 720 * S, 85 * S],
+        [1750 * S, -130 * S, 100 * S], // 10, 11
+        [-480 * S, 520 * S, 100 * S], // 12 (7시방향 끝)
         [620 * S, -580 * S, 100 * S],
-        [950 * S, -820 * S, 80 * S],
+        [950 * S, -820 * S, 80 * S], // 13, 14
       ];
       const rawMainTunnels = [
         [0, 1, 55 * S],
@@ -416,15 +432,13 @@
         [9, 10, 50 * S],
         [10, 11, 36 * S],
         [0, 12, 42 * S],
-        [12, 13, 32 * S],
-        [1, 14, 36 * S],
-        [14, 15, 28 * S],
+        [1, 13, 36 * S],
+        [13, 14, 28 * S],
       ];
-      // 사운드 방: 노드 배치용 (가로로 퍼진 3개 챔버 — 시각은 타원으로 override)
       const rawMapChambers = [
-        [0, 0, 140 * S], // 중앙
-        [-220 * S, 0, 100 * S], // 왼쪽
-        [220 * S, 0, 100 * S], // 오른쪽
+        [0, 0, 140 * S],
+        [-220 * S, 0, 100 * S],
+        [220 * S, 0, 100 * S],
       ];
       const rawMapTunnels = [
         [1, 0, 100 * S],
@@ -439,6 +453,11 @@
       let soundTextMesh = null,
         isTextHovered = false;
       let mainPortalMesh = null;
+      let onepieceMesh = null;
+      let stoneMesh = null,
+        stone2Mesh = null;
+      const STONE_RADIUS = 40;
+      const STONE2_RADIUS = 15;
 
       function colonySDF(x, z, chambers, tunnels) {
         let d = -Infinity;
@@ -464,8 +483,22 @@
       }
 
       function isPlayerInside(x, z) {
+        // 돌 충돌: 메인 맵에서만
+        if (activeNodes === mainWorldNodes) {
+          if (
+            stoneMesh &&
+            Math.hypot(x - stoneMesh.position.x, z - stoneMesh.position.z) <
+              STONE_RADIUS + 0.8
+          )
+            return false;
+          if (
+            stone2Mesh &&
+            Math.hypot(x - stone2Mesh.position.x, z - stone2Mesh.position.z) <
+              STONE2_RADIUS + 0.8
+          )
+            return false;
+        }
         if (activeNodes === mapWorldNodes) {
-          // 타원형 사운드 방 collision
           return (
             (x / MAP_RX) * (x / MAP_RX) + (z / MAP_RZ) * (z / MAP_RZ) < 0.97
           );
@@ -475,8 +508,6 @@
 
       function buildEllipseFloorGroup(rx, rz) {
         const group = new THREE.Group();
-
-        // 타원 바닥
         const SEG = 128;
         const pos = [],
           idx = [];
@@ -499,7 +530,6 @@
           ),
         );
 
-        // 바닥 텍스트: "Welcome to Listening chamber"
         const cv = document.createElement('canvas');
         cv.width = 4096;
         cv.height = 384;
@@ -633,6 +663,40 @@
         renderer.domElement.addEventListener('click', () => unlockAudio(), {
           once: true,
         });
+        // 일반 모드: 돌 클릭 → 10 screen px 이동
+        renderer.domElement.addEventListener('click', (e) => {
+          if (isAdminMode || !stoneMesh || !isLoaded) return;
+          mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+          mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+          raycaster.setFromCamera(mouse, camera);
+          const targets = [stoneMesh, stone2Mesh].filter(Boolean);
+          const hits = raycaster.intersectObjects(targets);
+          if (hits.length > 0) {
+            const hit = hits[0].object;
+            const ppu = (window.innerHeight / 100) * camera.zoom;
+            const mv = 10 / ppu;
+            const hp = hits[0].point;
+            const dx = hp.x - hit.position.x;
+            const dz = hp.z - hit.position.z;
+            const d = Math.hypot(dx, dz) || 1;
+            hit.position.x += (dx / d) * mv;
+            hit.position.z += (dz / d) * mv;
+            const key = hit.userData.stoneKey || '__stone__';
+            savedPositions[key] = [hit.position.x, hit.position.z];
+            localStorage.setItem(
+              'archive_fixed_pos',
+              JSON.stringify(savedPositions),
+            );
+          }
+        });
+        renderer.domElement.addEventListener('dblclick', (e) => {
+          if (!comboKeys.k || !onepieceMesh) return;
+          mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+          mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+          raycaster.setFromCamera(mouse, camera);
+          if (raycaster.intersectObject(onepieceMesh).length > 0)
+            downloadArchive();
+        });
         renderer.domElement.addEventListener('click', (e) => {
           if (activeNodes !== mapWorldNodes || !soundTextMesh || isAdminMode)
             return;
@@ -669,7 +733,6 @@
           comboKeys.k = comboKeys.enter = false;
         }
         if (isAdminMode && e.key.toLowerCase() === 'e') {
-          // 위치 내보내기: 클립보드 복사 + 파일 다운로드
           const json = JSON.stringify(savedPositions, null, 2);
           const blob = new Blob([json], { type: 'application/json' });
           const a = document.createElement('a');
@@ -679,7 +742,6 @@
           navigator.clipboard.writeText(json).catch(() => {});
         }
         if (isAdminMode && e.key.toLowerCase() === 'i') {
-          // 위치 불러오기: 파일 선택
           const input = document.createElement('input');
           input.type = 'file';
           input.accept = '.json,application/json';
@@ -695,7 +757,6 @@
                   'archive_fixed_pos',
                   JSON.stringify(savedPositions),
                 );
-                // 이미 배치된 노드 위치 즉시 반영
                 activeNodes.forEach((n) => {
                   const key = n.userData.isPortal
                     ? `portal:${n.userData.dest}`
@@ -745,19 +806,15 @@
         mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
         mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
         raycaster.setFromCamera(mouse, camera);
-
         const intersects = raycaster.intersectObjects(activeNodes);
         const hit = intersects.length > 0 ? intersects[0].object : null;
-
         if (e.shiftKey) {
           if (hit) {
-            // Shift+클릭: 개별 노드 선택 토글
             const idx = selectedNodes.indexOf(hit);
             if (idx === -1) selectedNodes.push(hit);
             else selectedNodes.splice(idx, 1);
             updateSelectionVisuals();
           } else {
-            // Shift+빈공간 드래그: 박스 선택 (기존 선택에 추가)
             isSelecting = true;
             selectionStart.set(e.clientX, e.clientY);
             const rect = document.getElementById('selection-rect');
@@ -769,10 +826,8 @@
           }
           return;
         }
-
         if (hit) {
           draggedNode = hit;
-          // 이미 선택된 노드를 클릭하면 선택 유지, 아니면 단독 선택
           if (!selectedNodes.includes(draggedNode)) {
             selectedNodes = [draggedNode];
             updateSelectionVisuals();
@@ -785,7 +840,6 @@
             (n) => (n.userData.startPos = n.position.clone()),
           );
         } else {
-          // 빈 공간 클릭: 선택 해제
           selectedNodes = [];
           updateSelectionVisuals();
         }
@@ -919,7 +973,7 @@
           const fillEl = document.getElementById('digging-fill');
           const overlayEl = document.getElementById('intro-overlay');
           const layerEl = document.getElementById('labels-layer');
-          let chamberUsageMain = new Array(rawMainChambers.length).fill(1); // 모든 챔버 항상 활성화
+          let chamberUsageMain = new Array(rawMainChambers.length).fill(1);
           let chamberUsageMap = new Array(rawMapChambers.length).fill(1);
           let categoryCounts = {};
 
@@ -934,12 +988,10 @@
               .replace(/^(https?:\/\/)?(www\.)?/, '')
               .split(/[/?#:]/)[0];
             const rawCat = (c[1] || '').trim().toLowerCase();
-            // ── 변경: sound 카테고리 → 포털 공간, map 포함 나머지 → 메인 맵 ──
             const isMap = /\bsound\b/.test(rawCat) && !/aporee/i.test(url);
             const meta = (c[2] || '').replace(/"/g, '').trim();
             const sum = (c[3] || '').replace(/"/g, '').trim();
 
-            /* DOM 라벨 생성 */
             const el = document.createElement('div');
             el.className = 'node-label';
             el.innerHTML =
@@ -1039,6 +1091,9 @@
               b.userData = {
                 url,
                 title,
+                meta,
+                cat: rawCat,
+                sum,
                 targetScale: 1,
                 currentScale: 1,
                 targetOpacity: 1,
@@ -1103,6 +1158,180 @@
         mapFloorGroup = buildEllipseFloorGroup(MAP_RX, MAP_RZ);
         mapFloorGroup.visible = false;
         scene.add(mapFloorGroup);
+        createOnepieceBlock();
+        createStone();
+        createStone2();
+      }
+
+      // ── 돌 장애물 ──────────────────────────────────────────────
+      function createStone() {
+        const SEG = 10;
+        const pos = [],
+          idx = [];
+        pos.push(0, 0.15, 0);
+        for (let i = 0; i < SEG; i++) {
+          const ang = (i / SEG) * Math.PI * 2;
+          const pr =
+            STONE_RADIUS *
+            (1.0 +
+              0.2 * Math.sin(ang * 2 + 1.1) +
+              0.13 * Math.sin(ang * 3 + 2.6));
+          pos.push(Math.cos(ang) * pr, 0.15, Math.sin(ang) * pr);
+        }
+        for (let i = 0; i < SEG; i++) idx.push(0, i + 1, ((i + 1) % SEG) + 1);
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+        geo.setIndex(idx);
+        stoneMesh = new THREE.Mesh(
+          geo,
+          new THREE.MeshBasicMaterial({
+            color: 0x444444,
+            side: THREE.DoubleSide,
+          }),
+        );
+        const saved = savedPositions['__stone__'];
+        stoneMesh.position.x = saved ? saved[0] : rawMainChambers[0][0] + 20;
+        stoneMesh.position.z = saved ? saved[1] : rawMainChambers[0][1] + 20;
+        stoneMesh.userData = {
+          isPortal: false,
+          isStone: true,
+          stoneKey: '__stone__',
+          url: '__stone__',
+          title: 'Stone',
+          targetScale: 1,
+          currentScale: 1,
+          targetOpacity: 1,
+          currentOpacity: 1,
+          w_world: STONE_RADIUS * 2,
+          h_world: STONE_RADIUS * 2,
+          domElement: null,
+          stoneRadius: STONE_RADIUS,
+        };
+        scene.add(stoneMesh);
+        mainWorldNodes.push(stoneMesh);
+      }
+
+      function createStone2() {
+        // 살짝 각지고 불규칙한 타원형 (rx:rz ≈ 1.6:1)
+        const SEG = 16;
+        const RX = STONE2_RADIUS * 1.6; // 가로 반지름 (넓적한 타원)
+        const RZ = STONE2_RADIUS * 1.0; // 세로 반지름
+        const pos = [],
+          idx = [];
+        pos.push(0, 0.15, 0);
+        for (let i = 0; i < SEG; i++) {
+          const ang = (i / SEG) * Math.PI * 2;
+          // 타원 기반 + 아주 작은 불규칙 요동
+          const baseX = Math.cos(ang) * RX;
+          const baseZ = Math.sin(ang) * RZ;
+          const nudge =
+            1.0 +
+            0.06 * Math.sin(ang * 2 + 0.8) + // 완만한 요동
+            0.04 * Math.sin(ang * 4 + 2.1); // 약간의 각짐
+          pos.push(baseX * nudge, 0.15, baseZ * nudge);
+        }
+        for (let i = 0; i < SEG; i++) idx.push(0, i + 1, ((i + 1) % SEG) + 1);
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+        geo.setIndex(idx);
+        stone2Mesh = new THREE.Mesh(
+          geo,
+          new THREE.MeshBasicMaterial({
+            color: 0x555555,
+            side: THREE.DoubleSide,
+          }),
+        );
+        const saved = savedPositions['__stone2__'];
+        stone2Mesh.position.x = saved ? saved[0] : rawMainChambers[0][0] + 35;
+        stone2Mesh.position.z = saved ? saved[1] : rawMainChambers[0][1] + 10;
+        stone2Mesh.userData = {
+          isPortal: false,
+          isStone: true,
+          stoneKey: '__stone2__',
+          url: '__stone2__',
+          title: 'Stone2',
+          targetScale: 1,
+          currentScale: 1,
+          targetOpacity: 1,
+          currentOpacity: 1,
+          w_world: STONE2_RADIUS * 2,
+          h_world: STONE2_RADIUS * 2,
+          domElement: null,
+          stoneRadius: STONE2_RADIUS,
+        };
+        scene.add(stone2Mesh);
+        mainWorldNodes.push(stone2Mesh);
+      }
+
+      // ── Onepiece 블록 ──────────────────────────────────────────
+      function createOnepieceBlock() {
+        // 2× 크기: 11×7 world units
+        const BW = 11,
+          BH = 7;
+        // Three.js mesh: 투명 (raycasting 전용)
+        const geo = new THREE.PlaneGeometry(BW, BH);
+        const mat = new THREE.MeshBasicMaterial({
+          transparent: true,
+          opacity: 0,
+        });
+        onepieceMesh = new THREE.Mesh(geo, mat);
+        onepieceMesh.rotation.x = -Math.PI / 2;
+        onepieceMesh.position.y = 0.3;
+
+        const saved = savedPositions['__onepiece__'];
+        onepieceMesh.position.x = saved ? saved[0] : rawMainChambers[0][0] + 15;
+        onepieceMesh.position.z = saved ? saved[1] : rawMainChambers[0][1] + 15;
+
+        // DOM 요소: 시각적 표현
+        const el = document.createElement('div');
+        el.className = 'onepiece-block';
+        el.textContent = 'Onepiece';
+        document.getElementById('labels-layer').appendChild(el);
+
+        onepieceMesh.userData = {
+          isPortal: false,
+          isOnepiece: true,
+          url: '__onepiece__',
+          title: 'Onepiece',
+          targetScale: 1,
+          currentScale: 1,
+          targetOpacity: 1,
+          currentOpacity: 1,
+          w_world: BW,
+          h_world: BH,
+          domElement: el,
+        };
+        scene.add(onepieceMesh);
+        mainWorldNodes.push(onepieceMesh);
+      }
+
+      // ── 전체 링크+메타데이터 텍스트 다운로드 ──────────────────
+      function downloadArchive() {
+        const allNodes = [...mainWorldNodes, ...mapWorldNodes].filter(
+          (n) => !n.userData.isPortal && !n.userData.isOnepiece,
+        );
+        allNodes.sort((a, b) =>
+          (a.userData.title || '').localeCompare(b.userData.title || ''),
+        );
+
+        const lines = ['ARCHIVE — All Links & Metadata', '='.repeat(52), ''];
+        allNodes.forEach((n, i) => {
+          const u = n.userData;
+          lines.push(`${i + 1}. ${u.title}`);
+          lines.push(`   URL      : ${u.url}`);
+          if (u.meta) lines.push(`   Meta     : ${u.meta}`);
+          if (u.cat) lines.push(`   Category : ${u.cat}`);
+          if (u.sum) lines.push(`   Summary  : ${u.sum}`);
+          lines.push('');
+        });
+
+        const blob = new Blob([lines.join('\n')], {
+          type: 'text/plain; charset=utf-8',
+        });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'archive.txt';
+        a.click();
       }
 
       function createPortals() {
@@ -1183,7 +1412,7 @@
         }
         activeNodes.forEach((n) => {
           if (n.userData.isPortal) {
-            minimapCtx.fillStyle = '#ff0000';
+            minimapCtx.fillStyle = '#000000';
             minimapCtx.fillRect(n.position.x - 15, n.position.z - 15, 30, 30);
           } else {
             minimapCtx.fillStyle = selectedNodes.includes(n)
@@ -1192,9 +1421,43 @@
             minimapCtx.fillRect(n.position.x - 5, n.position.z - 5, 10, 10);
           }
         });
+        // 돌 표시
+        if (activeNodes === mainWorldNodes) {
+          minimapCtx.save();
+          minimapCtx.translate(co, co);
+          minimapCtx.scale(sc, sc);
+          minimapCtx.translate(-player.position.x, -player.position.z);
+          if (stoneMesh) {
+            minimapCtx.fillStyle = '#444444';
+            minimapCtx.beginPath();
+            minimapCtx.arc(
+              stoneMesh.position.x,
+              stoneMesh.position.z,
+              STONE_RADIUS * 3,
+              0,
+              Math.PI * 2,
+            );
+            minimapCtx.fill();
+          }
+          if (stone2Mesh) {
+            minimapCtx.fillStyle = '#555555';
+            minimapCtx.beginPath();
+            minimapCtx.arc(
+              stone2Mesh.position.x,
+              stone2Mesh.position.z,
+              STONE2_RADIUS * 3,
+              0,
+              Math.PI * 2,
+            );
+            minimapCtx.fill();
+          }
+          minimapCtx.restore();
+        }
         minimapCtx.restore();
         minimapCtx.fillStyle = '#ff0000';
-        minimapCtx.fillRect(co - 3, co - 3, 6, 6);
+        minimapCtx.beginPath();
+        minimapCtx.arc(co, co, 4, 0, Math.PI * 2);
+        minimapCtx.fill();
       }
 
       function switchWorld(dest) {
@@ -1221,7 +1484,6 @@
         activeNodes.forEach((n) => {
           n.visible = true;
         });
-        // 포털에서 나오면 해당 포털 위치에 스폰
         const spawnX =
           dest === 'main' && mainPortalMesh ? mainPortalMesh.position.x : 0;
         const spawnZ =
@@ -1332,6 +1594,22 @@
                   ir > 0.05
                     ? `0 0 ${ir * 80}px ${ir * 40}px rgba(255,255,255,${ir * 0.9})`
                     : '';
+              } else if (u.isOnepiece) {
+                // Onepiece: ppu 기반 직접 크기 계산 + 빠른 RGB 사이클
+                const ow = u.w_world * ppu * u.currentScale;
+                const oh = u.h_world * ppu * u.currentScale;
+                u.domElement.style.width = ow + 'px';
+                u.domElement.style.height = oh + 'px';
+                u.domElement.style.fontSize = oh * 0.22 + 'px';
+                u.domElement.style.transform = `translate3d(${sx}px,${sy}px,0) translate(-50%,-50%)`;
+                // 빠른 RGB 그라데이션 (opacity 0.3)
+                const t = Date.now() * 0.01;
+                const r = Math.round(Math.sin(t) * 127 + 128);
+                const g = Math.round(Math.sin(t + 2.094) * 127 + 128);
+                const b = Math.round(Math.sin(t + 4.189) * 127 + 128);
+                const col = `rgba(${r},${g},${b},0.3)`;
+                u.domElement.style.color = col;
+                u.domElement.style.borderColor = col;
               } else {
                 const fs = scaleBase * u.currentScale;
                 u.domElement.style.transform = `translate3d(${sx}px,${sy}px,0) translate(-50%,-50%) scale(${fs})`;
@@ -1342,7 +1620,7 @@
             }
           }
         });
-        // 사운드 방 텍스트 hover
+
         if (activeNodes === mapWorldNodes && soundTextMesh) {
           raycaster.setFromCamera(mouse, camera);
           const hits = raycaster.intersectObject(soundTextMesh);
@@ -1366,6 +1644,7 @@
       function updateInteraction() {
         let target = null;
         for (const n of activeNodes) {
+          if (n.userData.isStone || n.userData.isOnepiece) continue;
           if (
             player.position.distanceTo(n.position) <
             (n.userData.isPortal ? 21 : 9)
