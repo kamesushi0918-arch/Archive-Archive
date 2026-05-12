@@ -604,6 +604,11 @@
         currentTrackIdx = -1;
 
       function _doPlay() {
+        if (!audioCtx || audioCtx.state !== 'running') {
+          pendingPlay = true;
+          return;
+        }
+        stopAudio();
         roomAudio = new Audio(TRACKS[currentTrackIdx]);
         roomAudio.play().catch((e) => console.warn('Audio:', e));
         roomAudio.onended = playNextTrack;
@@ -625,7 +630,18 @@
           roomAudio = null;
         }
       }
-      function unlockAudio() {}
+      let audioCtx = null,
+        pendingPlay = false;
+      function unlockAudio() {
+        if (audioCtx) return;
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        audioCtx.resume().then(() => {
+          if (pendingPlay) {
+            pendingPlay = false;
+            _doPlay();
+          }
+        });
+      }
 
       function init() {
         scene = new THREE.Scene();
