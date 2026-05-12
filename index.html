@@ -688,7 +688,7 @@
         currentTrackIdx = -1;
 
       function _doPlay() {
-        if (!audioCtx || audioCtx.state !== 'running') {
+        if (!audioCtx || (audioCtx.state && audioCtx.state !== 'running')) {
           pendingPlay = true;
           return;
         }
@@ -1584,6 +1584,7 @@
         activeNodes.forEach((n) => {
           n.visible = true;
         });
+        isInteractionPaused = false; // 월드 전환 후 인터랙션 재활성화
         const spawnX =
           dest === 'main' && mainPortalMesh ? mainPortalMesh.position.x : 0;
         const spawnZ =
