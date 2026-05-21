@@ -1,1802 +1,378 @@
 <!doctype html>
-<html lang="en">
+<html lang="ko">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Archive</title>
+    <title>Rubik's Cube Mockup</title>
     <style>
-      * {
-        margin: 0;
-        padding: 0;
-        box-sizing: border-box;
-      }
       body {
-        font-family: 'Georgia', serif;
-        background: #cccccc;
+        margin: 0;
         overflow: hidden;
-        user-select: none;
-      }
-      #intro-overlay {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100vw;
-        height: 100vh;
-        background: #ffffff;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        z-index: 5000;
-        transition:
-          opacity 1.5s ease-in-out,
-          visibility 1.5s;
-        pointer-events: none;
-      }
-      #digging-container {
-        position: relative;
-        font-size: 54pt;
-        font-weight: 400;
-      }
-      #digging-fill {
-        position: absolute;
-        top: 0;
-        left: 0;
-        color: black;
-        overflow: hidden;
-        width: 0%;
-        transition: width 0.3s ease-out;
-        white-space: nowrap;
-      }
-      #digging-bg {
-        color: #c0c0c0;
-      }
-      #ui-layer {
-        position: fixed;
-        top: 14px;
-        left: 18px;
-        font-size: 1rem;
-        color: #000;
-        z-index: 1000;
-        pointer-events: none;
-        opacity: 0.5;
-      }
-      #admin-status {
-        position: fixed;
-        top: 14px;
-        right: 18px;
-        font-size: 0.9rem;
-        color: red;
-        font-weight: bold;
-        display: none;
-        z-index: 2000;
-      }
-      #minimap {
-        position: fixed;
-        bottom: 20px;
-        right: 20px;
-        width: 200px;
-        height: 200px;
-        background: #cccccc;
-        border: 1px solid #999999;
-        z-index: 1000;
-        pointer-events: none;
-        overflow: hidden;
-      }
-      #selection-rect {
-        position: fixed;
-        border: 1px solid red;
-        background: rgba(255, 0, 0, 0.15);
-        pointer-events: none;
-        display: none;
-        z-index: 3000;
-      }
-      #link-list-panel {
-        position: fixed;
-        top: 50px;
-        left: 18px;
-        width: 320px;
-        max-height: 70vh;
-        background: rgba(255, 255, 255, 0.95);
-        border: 1px solid #999;
-        padding: 15px;
-        overflow-y: auto;
-        display: none;
-        z-index: 4000;
-        font-size: 0.85rem;
-      }
-      #link-list-panel h3 {
-        margin-bottom: 15px;
-        font-size: 1rem;
-        border-bottom: 2px solid #ccc;
-        padding-bottom: 8px;
-      }
-      .link-item {
-        padding: 8px 0;
-        cursor: pointer;
-        color: #333;
-        border-bottom: 1px solid #eee;
-        display: flex;
-        flex-direction: column;
-        gap: 4px;
-      }
-      .link-item-header {
-        display: flex;
-        gap: 8px;
-        font-weight: bold;
-      }
-      .link-item-header span {
-        color: #888;
-        min-width: 25px;
-      }
-      .link-item-url {
-        font-size: 0.75rem;
-        color: #666;
-        word-break: break-all;
-        padding-left: 33px;
-      }
-      .link-item:hover {
-        background: rgba(255, 0, 0, 0.05);
-      }
-      .link-item:hover .link-item-header {
-        color: red;
+        background-color: #f0f0f0;
       }
       canvas {
         display: block;
       }
-
-      #labels-layer {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100vw;
-        height: 100vh;
-        pointer-events: none;
-        z-index: 500;
-      }
-
-      /* ── 노드 라벨: 배경 투명, Georgia regular ── */
-      .node-label {
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: max-content;
-        white-space: nowrap;
-        background: transparent;
-        padding: 0;
-        display: flex;
-        flex-direction: column;
-        gap: 0;
-        will-change: transform, opacity;
-        pointer-events: none;
-        font-family: 'Georgia', serif;
-        font-weight: 400;
-        font-style: normal;
-        line-height: 1.35;
-        color: #000;
-      }
-
-      .node-meta {
-        font-size: 20px;
-        color: #666666;
-        font-weight: 400;
-        font-style: normal;
-        line-height: 1.35;
-        margin-bottom: -3px;
-      }
-
-      .node-title {
-        font-size: 30px;
-        color: #000000;
-        font-weight: 400;
-        line-height: 1.35;
-        margin-bottom: 2px;
-      }
-
-      .node-cat {
-        font-size: 16px;
-        color: #999999;
-        font-weight: 400;
-        font-style: normal;
-        line-height: 1.35;
-        margin-bottom: 2px;
-      }
-
-      .node-sum {
-        font-size: 18px;
-        color: #000000;
-        font-weight: 400;
-        font-style: normal;
-        line-height: 1.35;
-        white-space: normal;
-        max-width: 480px;
-        margin-bottom: 0;
-      }
-
-      /* ── 선택된 노드 강조 ── */
-      .node-label.selected {
-        outline: 1.5px solid red;
-        outline-offset: 4px;
-      }
-
-      /* ── Onepiece 블록 ── */
-      .onepiece-block {
-        position: absolute;
-        top: 0;
-        left: 0;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        box-sizing: border-box;
-        border: 4px solid;
-        font-family: 'Georgia', serif;
-        font-weight: 700;
-        will-change: transform;
-        pointer-events: none;
-        white-space: nowrap;
-      }
-
-      /* ── 포털 ── */
-      .portal-node {
-        position: absolute;
-        top: 0;
-        left: 0;
-        background: rgba(0, 0, 0, 0.5);
-        border-radius: 50%;
-        pointer-events: none;
-        will-change: transform, opacity;
-      }
-
-      /* ── 플레이어 & 진행 링 ── */
-      #player-dot {
-        position: fixed;
-        top: 50%;
-        left: 50%;
-        background: black;
-        border-radius: 50%;
-        transform: translate(-50%, -50%);
-        z-index: 1000;
-        pointer-events: none;
-      }
-      #progress-ring {
-        position: fixed;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%) rotate(-90deg);
-        z-index: 999;
-        pointer-events: none;
-        opacity: 0;
-      }
-      #progress-ring circle {
-        stroke-dasharray: 283;
-        stroke-dashoffset: 283;
-        transition: stroke-dashoffset 0.1s linear;
-      }
     </style>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   </head>
   <body>
-    <div id="intro-overlay">
-      <div id="digging-container">
-        <span id="digging-bg">Archive digging...</span>
-        <div id="digging-fill">Archive digging...</div>
-      </div>
-    </div>
-    <div id="ui-layer">Use arrow keys to move and stay to open</div>
-    <div id="admin-status">
-      ADMIN MODE ACTIVE (Shift+Click/Drag: Select · Drag: Move · L: List · E:
-      Export · I: Import)
-    </div>
-    <div id="selection-rect"></div>
-    <div id="link-list-panel">
-      <h3>Archive Nodes (A-Z) <span id="node-count"></span></h3>
-      <div id="link-items-container"></div>
-    </div>
-    <div id="labels-layer" style="opacity: 0; transition: opacity 0.8s"></div>
-    <div id="player-dot"></div>
-    <svg id="progress-ring" viewBox="0 0 100 100">
-      <circle
-        cx="50"
-        cy="50"
-        r="45"
-        fill="none"
-        stroke="black"
-        stroke-width="8"
-      />
-    </svg>
-    <canvas id="minimap" width="200" height="200"></canvas>
-
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
     <script>
-      let savedPositions = {
-        'cyberneticzoo.com': [88, 4],
-        'downloads.khinsider.com': [54, -63],
-        'ancientartarchive.org': [-48, 68],
-        'biodiversitylibrary.org': [-94, 18],
-        'lostmediawiki.com': [-42, -308],
-        'openprocessing.org': [-10, -185],
-        'publicdomainreview.org': [-14, 41],
-        'oldbookillustrations.com': [-70, 10],
-        'stanwinstonschool.com': [150, -12],
-        'glitchart.com': [-30, 22],
-        'opengameart.org': [856, -46],
-        'spriters-resource.com': [886, -73],
-        'models-resource.com': [127, 7],
-        'manualslib.com': [-37, -46],
-        'hifructose.com': [-611, -31],
-        'bbc.co.uk': [-402, 26],
-        'conservethesound.de': [-394, 6],
-        'ubu.com': [13, 125],
-        'cavinguk.co.uk': [-7, 104],
-        'planetmountain.com': [41, 277],
-        'stonetoolsmuseum.com': [32, 293],
-        'quickdrawpublications.com': [28, 244],
-        'sciencefictionarchives.com': [503, -38],
-        'models.spriters-resource.com': [352, -36],
-        'https://www.vgmaps.com/': [96, -16],
-        'portal:map': [-240, 259],
-        'https://www.manualslib.com/': [34, 624],
-        'https://stonetoolsmuseum.com/': [67, 5],
-        'https://www.sosbrutalism.org/cms/15802395#gallery': [-83, 6],
-        'https://www.stanwinstonschool.com/': [324, -309],
-        'https://www.bbc.co.uk/sound-effects': [12, -55],
-        'https://texturelabs.org/': [-333, 103],
-        'https://www.xeno-canto.org/': [-755, 91],
-        'https://ubu.com': [85, 22],
-        'https://www.planetmountain.com/en/routes/climbing-routes': [499, -38],
-        'https://www.kineticart.org/': [33, 416],
-        'https://aaa.org.hk/en': [-529, -13],
-        'https://opengameart.org/': [-18, -342],
-        'https://animation.filmarchives.jp/en/index.html': [-48, -397],
-        'https://www.this-is-cool.co.uk/': [278, -296],
-        'https://lostmediawiki.com/': [-117, 31],
-        'https://materio.com': [9, 97],
-        'http://thepatternlibrary.com/': [-577, 12],
-        'https://oldbookillustrations.com': [-419, 15],
-        'https://downloads.khinsider.com': [41, 52],
-        'https://cyberneticzoo.com': [56, 344],
-        'https://models.spriters-resource.com/': [105, -545],
-        'https://www.spriters-resource.com/': [92, -515],
-        'https://ancientartarchive.org': [-272, 46],
-        'http://www.sciencefictionarchives.com/': [-95, -356],
-        'https://villains.fandom.com/': [14, -38],
-        'https://sf-encyclopedia.com/': [31, -78],
-        'https://ultra.fandom.com/': [-77, -608],
-        'https://www.contemporary-african-art.com/african-masks.html': [
-          -400, 63,
-        ],
-        'https://images.nasa.gov/': [25, 202],
-        'https://maps.stamen.com/': [174, -26],
-        'https://www.davidrumsey.com/': [244, -17],
-        'https://openprocessing.org/': [-569, -70],
-        'https://biodiversitylibrary.org': [-297, 25],
-        'https://native-land.ca/': [411, -72],
-        'https://glitchart.com/': [-641, -29],
-        'https://www.models-resource.com/': [329, -272],
-        'https://haikyo.org/': [671, 28],
-        'https://mingeikan.or.jp/collection_series/japan_dyeing_weaving/?lang=en':
-          [-340, 5],
-        'https://urbexology.com/': [689, 12],
-        'https://www.digitalhimalaya.com/collections/maps/': [860, -44],
-        'https://quickdrawpublications.com/free-topos/': [468, -92],
-        'https://cavinguk.co.uk': [888, -85],
-        'https://www.oldmapsonline.org/': [461, 13],
-        'https://wikizilla.org/': [-128, -570],
-        'https://aesthetics.fandom.com/wiki/Aesthetics_Wiki': [-784, 93],
-        'https://mapgenie.io/': [-59, -303],
-        'https://www.oceanicartsaustralia.com/': [-178, 29],
-        'https://thedarkatlas.com/': [710, 65],
-        'https://cascadology.com/ko/map': [625, -5],
-        'https://hifructose.com/category/has-images/': [-747, 76],
-        'https://aporee.org': [-25, 40],
-        'https://www.conservethesound.de/': [-85, 22],
-        __onepiece__: [476, -411],
-        __stone__: [573, -36],
-        __stone2__: [579, 14],
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0xf5f5f7);
+
+      const camera = new THREE.PerspectiveCamera(
+        45,
+        window.innerWidth / window.innerHeight,
+        0.1,
+        1000,
+      );
+      camera.position.set(4.5, 4.5, 6.5);
+
+      const renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(window.devicePixelRatio);
+      renderer.shadowMap.enabled = true;
+      document.body.appendChild(renderer.domElement);
+
+      const controls = new THREE.OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.05;
+
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+      scene.add(ambientLight);
+
+      const dirLight1 = new THREE.DirectionalLight(0xffffff, 0.6);
+      dirLight1.position.set(6, 10, 6);
+      dirLight1.castShadow = true;
+      dirLight1.shadow.mapSize.width = 2048;
+      dirLight1.shadow.mapSize.height = 2048;
+      scene.add(dirLight1);
+
+      const dirLight2 = new THREE.DirectionalLight(0xffffff, 0.3);
+      dirLight2.position.set(-6, -4, -6);
+      scene.add(dirLight2);
+
+      const size = 512;
+      const faces = {};
+
+      function createBaseCanvas() {
+        const canvas = document.createElement('canvas');
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, size, size);
+        return { canvas, ctx };
+      }
+
+      const energetic = createBaseCanvas();
+      let grad = energetic.ctx.createLinearGradient(0, 0, size, 0);
+      grad.addColorStop(0, '#ffffff');
+      grad.addColorStop(1, '#e2df6a');
+      energetic.ctx.fillStyle = grad;
+      energetic.ctx.fillRect(0, 0, size, size);
+      energetic.ctx.fillStyle = '#e5e255';
+      const circles = [
+        { x: 50, y: 256, r: 35 },
+        { x: 180, y: 150, r: 25 },
+        { x: 130, y: 400, r: 60 },
+        { x: 350, y: 120, r: 45 },
+        { x: 450, y: 230, r: 20 },
+        { x: 410, y: 380, r: 30 },
+        { x: 290, y: 480, r: 50 },
+      ];
+      circles.forEach((c) => {
+        energetic.ctx.beginPath();
+        energetic.ctx.arc(c.x, c.y, c.r, 0, Math.PI * 2);
+        energetic.ctx.fill();
+      });
+      energetic.ctx.save();
+      energetic.ctx.translate(350, 256);
+      energetic.ctx.rotate(Math.PI / 2);
+      energetic.ctx.fillStyle = '#b6b332';
+      energetic.ctx.font = 'bold 72px Helvetica, Arial, sans-serif';
+      energetic.ctx.textAlign = 'center';
+      energetic.ctx.fillText('Ener-', 0, -20);
+      energetic.ctx.fillText('getic', 0, 50);
+      energetic.ctx.restore();
+      energetic.ctx.fillStyle = '#b6b332';
+      energetic.ctx.font = '16px Helvetica';
+      energetic.ctx.fillText('by Seoul', 30, 310);
+      faces.energetic = energetic.canvas;
+
+      const concrete = createBaseCanvas();
+      concrete.ctx.fillStyle = '#9e9e9e';
+      concrete.ctx.fillRect(0, 0, size, size);
+      concrete.ctx.fillStyle = '#7a7a7a';
+      concrete.ctx.beginPath();
+      concrete.ctx.moveTo(0, 100);
+      concrete.ctx.lineTo(size, 240);
+      concrete.ctx.lineTo(size, 260);
+      concrete.ctx.lineTo(0, 260);
+      concrete.ctx.fill();
+      concrete.ctx.beginPath();
+      concrete.ctx.moveTo(0, 350);
+      concrete.ctx.lineTo(size, 250);
+      concrete.ctx.lineTo(size, size);
+      concrete.ctx.lineTo(0, size);
+      concrete.ctx.fill();
+      concrete.ctx.fillStyle = '#545454';
+      concrete.ctx.font = 'bold 72px Helvetica, Arial, sans-serif';
+      concrete.ctx.fillText('Concrete', 30, 280);
+      concrete.ctx.fillText('City', 30, 350);
+      concrete.ctx.font = '16px Helvetica';
+      concrete.ctx.fillText('by Seoul', 420, 480);
+      faces.concrete = concrete.canvas;
+
+      const heritage = createBaseCanvas();
+      grad = heritage.ctx.createLinearGradient(0, size, 0, 0);
+      grad.addColorStop(0, '#ffffff');
+      grad.addColorStop(1, '#97b1a6');
+      heritage.ctx.fillStyle = grad;
+      heritage.ctx.fillRect(0, 0, size, size);
+      heritage.ctx.fillStyle = '#6d8c80';
+      heritage.ctx.fillRect(100, 240, 312, 180);
+      heritage.ctx.beginPath();
+      heritage.ctx.arc(256, 420, 90, Math.PI, 0);
+      heritage.ctx.fillStyle = grad;
+      heritage.ctx.fill();
+      heritage.ctx.fillStyle = '#6d8c80';
+      heritage.ctx.fillRect(130, 200, 252, 40);
+      heritage.ctx.beginPath();
+      heritage.ctx.moveTo(150, 200);
+      heritage.ctx.lineTo(110, 160);
+      heritage.ctx.lineTo(402, 160);
+      heritage.ctx.lineTo(362, 200);
+      heritage.ctx.fill();
+      heritage.ctx.fillRect(226, 140, 60, 20);
+      heritage.ctx.font = 'bold 76px Helvetica, Arial, sans-serif';
+      heritage.ctx.fillStyle = '#527064';
+      heritage.ctx.fillText('Heritage', 40, 110);
+      heritage.ctx.font = '16px Helvetica';
+      heritage.ctx.fillText('by Seoul', 430, 490);
+      faces.heritage = heritage.canvas;
+
+      const hangang = createBaseCanvas();
+      grad = hangang.ctx.createLinearGradient(0, 0, 0, size);
+      grad.addColorStop(0, '#ffffff');
+      grad.addColorStop(1, '#9cbcd4');
+      hangang.ctx.fillStyle = grad;
+      hangang.ctx.fillRect(0, 0, size, size);
+      hangang.ctx.fillStyle = '#7ba2c2';
+      const bars = [
+        { x: 50, y: 150, w: 300, h: 30 },
+        { x: 100, y: 200, w: 350, h: 25 },
+        { x: 20, y: 260, w: 200, h: 40 },
+        { x: 150, y: 320, w: 250, h: 35 },
+      ];
+      bars.forEach((b) => hangang.ctx.fillRect(b.x, b.y, b.w, b.h));
+      hangang.ctx.save();
+      hangang.ctx.translate(256, 400);
+      hangang.ctx.rotate(Math.PI);
+      hangang.ctx.fillStyle = '#4c7496';
+      hangang.ctx.font = 'bold 72px Helvetica, Arial, sans-serif';
+      hangang.ctx.textAlign = 'center';
+      hangang.ctx.fillText('Hangang', 0, -30);
+      hangang.ctx.fillText('River', 0, 40);
+      hangang.ctx.restore();
+      hangang.ctx.fillStyle = '#4c7496';
+      hangang.ctx.font = '16px Helvetica';
+      hangang.ctx.fillText('by Seoul', 20, 30);
+      faces.hangang = hangang.canvas;
+
+      const nature = createBaseCanvas();
+      grad = nature.ctx.createLinearGradient(size, 0, 0, 0);
+      grad.addColorStop(0, '#ffffff');
+      grad.addColorStop(1, '#436144');
+      nature.ctx.fillStyle = grad;
+      nature.ctx.fillRect(0, 0, size, size);
+      nature.ctx.fillStyle = '#2d472e';
+      nature.ctx.beginPath();
+      nature.ctx.moveTo(size, 120);
+      nature.ctx.lineTo(150, 200);
+      nature.ctx.lineTo(size, 320);
+      nature.ctx.fill();
+      nature.ctx.save();
+      nature.ctx.translate(120, 256);
+      nature.ctx.rotate(-Math.PI / 2);
+      nature.ctx.fillStyle = '#233b24';
+      nature.ctx.font = 'bold 72px Helvetica, Arial, sans-serif';
+      nature.ctx.textAlign = 'center';
+      nature.ctx.fillText('Urban-', 0, -20);
+      nature.ctx.fillText('Nature', 0, 50);
+      nature.ctx.restore();
+      nature.ctx.fillStyle = '#233b24';
+      nature.ctx.font = '16px Helvetica';
+      nature.ctx.fillText('by Seoul', 430, 30);
+      faces.nature = nature.canvas;
+
+      const center = createBaseCanvas();
+      center.ctx.fillStyle = '#ffffff';
+      center.ctx.fillRect(0, 0, size, size);
+      const greyBars = [
+        { x: 300, y: 50, w: 120, h: 40, g: ['#888888', '#eeeeee'] },
+        { x: 50, y: 120, w: 100, h: 160, g: ['#eeeeee', '#888888'] },
+        { x: 420, y: 150, w: 40, h: 100, g: ['#888888', '#ffffff'] },
+        { x: 370, y: 220, w: 30, h: 140, g: ['#ffffff', '#666666'] },
+        { x: 80, y: 350, w: 60, h: 60, g: ['#999999', '#eeeeee'] },
+        { x: 230, y: 380, w: 110, h: 180, g: ['#eeeeee', '#505050'] },
+      ];
+      greyBars.forEach((b) => {
+        let g = center.ctx.createLinearGradient(b.x, b.y, b.x, b.y + b.h);
+        g.addColorStop(0, b.g[0]);
+        g.addColorStop(1, b.g[1]);
+        center.ctx.fillStyle = g;
+        center.ctx.fillRect(b.x, b.y, b.w, b.h);
+      });
+      center.ctx.fillStyle = '#888888';
+      center.ctx.font = '16px Helvetica';
+      center.ctx.fillText('by Seoul', 420, 480);
+      faces.center = center.canvas;
+
+      const textureMaps = {
+        energetic: new THREE.CanvasTexture(faces.energetic),
+        concrete: new THREE.CanvasTexture(faces.concrete),
+        heritage: new THREE.CanvasTexture(faces.heritage),
+        hangang: new THREE.CanvasTexture(faces.hangang),
+        center: new THREE.CanvasTexture(faces.center),
+        nature: new THREE.CanvasTexture(faces.nature),
       };
-      const SHEET_ID = '19uD7rBe4Ic6nIR-0LJ2anEdeWTZKbR9WlcT-g8wzGx4';
-      const GID = '729859851';
-      const S = 0.5;
-      const MAP_RX = 400 * S;
-      const MAP_RZ = 180 * S;
 
-      function mulberry32(a) {
-        return function () {
-          let t = (a += 0x6d2b79f5);
-          t = Math.imul(t ^ (t >>> 15), t | 1);
-          t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-          return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-        };
+      const rubikGroup = new THREE.Group();
+      scene.add(rubikGroup);
+
+      const cSize = 0.58;
+      const gap = 0.02;
+      const offset = cSize + gap;
+      const blackMaterial = new THREE.MeshStandardMaterial({
+        color: 0x111111,
+        roughness: 0.5,
+      });
+
+      for (let x = 0; x < 3; x++) {
+        for (let y = 0; y < 3; y++) {
+          for (let z = 0; z < 3; z++) {
+            if (x === 1 && y === 1 && z === 1) continue;
+
+            const materials = Array(6).fill(blackMaterial);
+
+            if (x === 2)
+              materials[0] = createSubMaterial(
+                textureMaps.energetic,
+                x,
+                y,
+                z,
+                0,
+              );
+            if (x === 0)
+              materials[1] = createSubMaterial(
+                textureMaps.concrete,
+                x,
+                y,
+                z,
+                1,
+              );
+            if (y === 2)
+              materials[2] = createSubMaterial(
+                textureMaps.heritage,
+                x,
+                y,
+                z,
+                2,
+              );
+            if (y === 0)
+              materials[3] = createSubMaterial(textureMaps.hangang, x, y, z, 3);
+            if (z === 2)
+              materials[4] = createSubMaterial(textureMaps.center, x, y, z, 4);
+            if (z === 0)
+              materials[5] = createSubMaterial(textureMaps.nature, x, y, z, 5);
+
+            const geom = new THREE.BoxGeometry(cSize, cSize, cSize);
+            const cubie = new THREE.Mesh(geom, materials);
+
+            cubie.position.set(
+              (x - 1) * offset,
+              (y - 1) * offset,
+              (z - 1) * offset,
+            );
+
+            cubie.castShadow = true;
+            cubie.receiveShadow = true;
+            rubikGroup.add(cubie);
+          }
+        }
       }
 
-      function getSeedFromStr(str) {
-        let hash = 0;
-        for (let i = 0; i < str.length; i++)
-          hash = (Math.imul(31, hash) + str.charCodeAt(i)) | 0;
-        return hash;
-      }
+      function createSubMaterial(baseTexture, x, y, z, faceIndex) {
+        const tex = baseTexture.clone();
+        tex.needsUpdate = true;
 
-      function parseCSV(str) {
-        const arr = [];
-        let quote = false,
-          row = 0,
-          col = 0;
-        for (let c = 0; c < str.length; c++) {
-          let cc = str[c],
-            nc = str[c + 1];
-          arr[row] = arr[row] || [];
-          arr[row][col] = arr[row][col] || '';
-          if (cc === '"' && quote && nc === '"') {
-            arr[row][col] += cc;
-            ++c;
-            continue;
-          }
-          if (cc === '"') {
-            quote = !quote;
-            continue;
-          }
-          if (cc === ',' && !quote) {
-            ++col;
-            continue;
-          }
-          if (cc === '\r' && nc === '\n' && !quote) {
-            ++row;
-            col = 0;
-            ++c;
-            continue;
-          }
-          if (cc === '\n' && !quote) {
-            ++row;
-            col = 0;
-            continue;
-          }
-          if (cc === '\r' && !quote) {
-            ++row;
-            col = 0;
-            continue;
-          }
-          arr[row][col] += cc;
+        tex.repeat.set(1 / 3, 1 / 3);
+
+        let u = 0,
+          v = 0;
+        if (faceIndex === 0) {
+          u = 2 - z;
+          v = y;
+        } else if (faceIndex === 1) {
+          u = z;
+          v = y;
+        } else if (faceIndex === 2) {
+          u = x;
+          v = 2 - z;
+        } else if (faceIndex === 3) {
+          u = x;
+          v = z;
+        } else if (faceIndex === 4) {
+          u = x;
+          v = y;
+        } else if (faceIndex === 5) {
+          u = 2 - x;
+          v = y;
         }
-        return arr;
-      }
 
-      let scene, camera, renderer, player;
-      let moveKeys = {
-        ArrowUp: false,
-        ArrowDown: false,
-        ArrowLeft: false,
-        ArrowRight: false,
-        '<': false,
-        '>': false,
-        Shift: false,
-      };
-      let mouseEdge = { up: false, down: false, left: false, right: false };
-      let comboKeys = { k: false, enter: false };
-      let mainWorldNodes = [],
-        mapWorldNodes = [],
-        activeNodes = mainWorldNodes;
-      let isLoaded = false,
-        isInteractionPaused = false;
-      const minimapCtx = document.getElementById('minimap').getContext('2d');
-      let isAdminMode = false,
-        draggedNode = null,
-        selectedNodes = [];
-      let dragStartWorld = new THREE.Vector3(),
-        selectionStart = new THREE.Vector2();
-      let isSelecting = false;
-      const raycaster = new THREE.Raycaster(),
-        mouse = new THREE.Vector2();
+        tex.offset.set(u / 3, v / 3);
 
-      const rawMainChambers = [
-        [0 * S, 0 * S, 230 * S],
-        [-100 * S, -700 * S, 160 * S], // 0, 1
-        [-200 * S, -1150 * S, 130 * S],
-        [200 * S, -1050 * S, 100 * S], // 2, 3
-        [100 * S, 800 * S, 140 * S],
-        [60 * S, 1250 * S, 110 * S], // 4, 5 (portal)
-        [-700 * S, 100 * S, 180 * S],
-        [-1200 * S, -60 * S, 150 * S], // 6, 7
-        [-1550 * S, 180 * S, 110 * S],
-        [900 * S, -100 * S, 170 * S], // 8, 9
-        [1400 * S, 50 * S, 145 * S],
-        [1750 * S, -130 * S, 100 * S], // 10, 11
-        [-480 * S, 520 * S, 100 * S], // 12 (7시방향 끝)
-        [620 * S, -580 * S, 100 * S],
-        [950 * S, -820 * S, 80 * S], // 13, 14
-      ];
-      const rawMainTunnels = [
-        [0, 1, 55 * S],
-        [1, 2, 42 * S],
-        [1, 3, 38 * S],
-        [0, 4, 50 * S],
-        [4, 5, 40 * S],
-        [0, 6, 60 * S],
-        [6, 7, 48 * S],
-        [7, 8, 40 * S],
-        [0, 9, 58 * S],
-        [9, 10, 50 * S],
-        [10, 11, 36 * S],
-        [0, 12, 42 * S],
-        [1, 13, 36 * S],
-        [13, 14, 28 * S],
-      ];
-      const rawMapChambers = [
-        [0, 0, 140 * S],
-        [-220 * S, 0, 100 * S],
-        [220 * S, 0, 100 * S],
-      ];
-      const rawMapTunnels = [
-        [1, 0, 100 * S],
-        [0, 2, 100 * S],
-      ];
-
-      let _activeChambers = [],
-        _activeTunnels = [];
-      let mainFloorGroup, mapFloorGroup, _mainConfig, _mapConfig;
-      let stayStartTime = null,
-        currentTarget = null;
-      let soundTextMesh = null,
-        isTextHovered = false;
-      let mainPortalMesh = null;
-      let onepieceMesh = null;
-      let stoneMesh = null,
-        stone2Mesh = null;
-      const STONE_RADIUS = 40;
-      const STONE2_RADIUS = 15;
-
-      function colonySDF(x, z, chambers, tunnels) {
-        let d = -Infinity;
-        if (!chambers || !chambers.length) return d;
-        for (const [cx, cz, r] of chambers)
-          d = Math.max(d, r - Math.hypot(x - cx, z - cz));
-        for (const [a, b, hw] of tunnels) {
-          if (!chambers[a] || !chambers[b]) continue;
-          const ax = chambers[a][0],
-            az = chambers[a][1],
-            bx = chambers[b][0],
-            bz = chambers[b][1];
-          const dx = bx - ax,
-            dz = bz - az,
-            len2 = dx * dx + dz * dz;
-          const t =
-            len2 > 0
-              ? Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / len2))
-              : 0;
-          d = Math.max(d, hw - Math.hypot(x - ax - t * dx, z - az - t * dz));
+        let r = 0.3,
+          m = 0.05;
+        if (faceIndex === 1) {
+          r = 0.5;
+          m = 0.1;
+        } else if (faceIndex === 3) {
+          r = 0.2;
+          m = 0.1;
+        } else if (faceIndex === 5) {
+          r = 0.4;
         }
-        return d;
-      }
 
-      function isPlayerInside(x, z) {
-        // 돌 충돌: 메인 맵에서만
-        if (activeNodes === mainWorldNodes) {
-          if (
-            stoneMesh &&
-            Math.hypot(x - stoneMesh.position.x, z - stoneMesh.position.z) <
-              STONE_RADIUS + 0.8
-          )
-            return false;
-          if (
-            stone2Mesh &&
-            Math.hypot(x - stone2Mesh.position.x, z - stone2Mesh.position.z) <
-              STONE2_RADIUS + 0.8
-          )
-            return false;
-        }
-        if (activeNodes === mapWorldNodes) {
-          return (
-            (x / MAP_RX) * (x / MAP_RX) + (z / MAP_RZ) * (z / MAP_RZ) < 0.97
-          );
-        }
-        return colonySDF(x, z, _activeChambers, _activeTunnels) > 1.5;
-      }
-
-      function buildEllipseFloorGroup(rx, rz) {
-        const group = new THREE.Group();
-        const SEG = 128;
-        const pos = [],
-          idx = [];
-        pos.push(0, 0, 0);
-        for (let i = 0; i < SEG; i++) {
-          const ang = (i / SEG) * Math.PI * 2;
-          pos.push(Math.cos(ang) * rx, 0, Math.sin(ang) * rz);
-        }
-        for (let i = 0; i < SEG; i++) idx.push(0, i + 1, ((i + 1) % SEG) + 1);
-        const geo = new THREE.BufferGeometry();
-        geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-        geo.setIndex(idx);
-        group.add(
-          new THREE.Mesh(
-            geo,
-            new THREE.MeshBasicMaterial({
-              color: 0xffffff,
-              side: THREE.DoubleSide,
-            }),
-          ),
-        );
-
-        const cv = document.createElement('canvas');
-        cv.width = 4096;
-        cv.height = 384;
-        const ctx = cv.getContext('2d');
-        ctx.font = '400 160pt Georgia';
-        ctx.fillStyle = '#000000';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('Welcome to Listening chamber', 2048, 192);
-        const tex = new THREE.CanvasTexture(cv);
-        tex.minFilter = THREE.LinearFilter;
-        const tW = rx * 1.75,
-          tH = tW * (384 / 4096);
-        const tGeo = new THREE.PlaneGeometry(tW, tH);
-        const tMat = new THREE.MeshBasicMaterial({
+        return new THREE.MeshStandardMaterial({
           map: tex,
-          transparent: true,
-          opacity: 0.3,
-        });
-        soundTextMesh = new THREE.Mesh(tGeo, tMat);
-        soundTextMesh.rotation.x = -Math.PI / 2;
-        soundTextMesh.position.y = 0.05;
-        group.add(soundTextMesh);
-
-        group.position.y = -0.1;
-        return group;
-      }
-
-      function buildFloorGroup(chambers, tunnels) {
-        const group = new THREE.Group();
-        const mat = new THREE.MeshBasicMaterial({ color: 0xffffff });
-        chambers.forEach(([cx, cz, r]) => {
-          const mesh = new THREE.Mesh(new THREE.CircleGeometry(r, 64), mat);
-          mesh.rotation.x = -Math.PI / 2;
-          mesh.position.set(cx, 0, cz);
-          group.add(mesh);
-        });
-        tunnels.forEach(([a, b, hw]) => {
-          const p1 = chambers[a],
-            p2 = chambers[b];
-          if (!p1 || !p2) return;
-          const dx = p2[0] - p1[0],
-            dz = p2[1] - p1[1],
-            dist = Math.hypot(dx, dz),
-            angle = Math.atan2(dz, dx);
-          const mesh = new THREE.Mesh(
-            new THREE.PlaneGeometry(dist, hw * 2),
-            mat,
-          );
-          mesh.rotation.x = -Math.PI / 2;
-          const pivot = new THREE.Group();
-          pivot.position.set((p1[0] + p2[0]) / 2, 0, (p1[1] + p2[1]) / 2);
-          pivot.rotation.y = -angle;
-          pivot.add(mesh);
-          group.add(pivot);
-        });
-        group.position.y = -0.1;
-        return group;
-      }
-
-      // ── 사운드 방 오디오 ─────────────────────────────────────────
-      const TRACKS = [
-        'SheetCMS/assets/music/Aphex_Twin_-_Ageispolis_-_R_S_Records.mp3',
-        'SheetCMS/assets/music/minipops.mp3',
-        'SheetCMS/assets/music/lights.mp3',
-        'SheetCMS/assets/music/Oneohtrix_Point_Never___Lifeworld_-_subsuelo.mp3',
-        'SheetCMS/assets/music/stretch_out_-_Tsutchie.mp3',
-        'SheetCMS/assets/music/Europe_Endless__2009_Remaster__-_Kraftwerk.mp3',
-        'SheetCMS/assets/music/nujabes.mp3',
-      ];
-      let roomAudio = null,
-        currentTrackIdx = -1;
-
-      function _doPlay() {
-        if (!audioCtx || (audioCtx.state && audioCtx.state !== 'running')) {
-          pendingPlay = true;
-          return;
-        }
-        stopAudio();
-        roomAudio = new Audio(TRACKS[currentTrackIdx]);
-        roomAudio.play().catch((e) => console.warn('Audio:', e));
-        roomAudio.onended = playNextTrack;
-      }
-      function playRandomTrack() {
-        stopAudio();
-        currentTrackIdx = Math.floor(Math.random() * TRACKS.length);
-        _doPlay();
-      }
-      function playNextTrack() {
-        stopAudio();
-        currentTrackIdx = (currentTrackIdx + 1) % TRACKS.length;
-        _doPlay();
-      }
-      function stopAudio() {
-        if (roomAudio) {
-          roomAudio.pause();
-          roomAudio.src = '';
-          roomAudio = null;
-        }
-      }
-      let audioCtx = null,
-        pendingPlay = false;
-      function unlockAudio() {
-        if (audioCtx) return;
-        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        audioCtx.resume().then(() => {
-          if (pendingPlay) {
-            pendingPlay = false;
-            _doPlay();
-          }
+          roughness: r,
+          metalness: m,
         });
       }
 
-      function init() {
-        scene = new THREE.Scene();
-        scene.background = new THREE.Color(0xcccccc);
-        const aspect = window.innerWidth / window.innerHeight,
-          d = 50;
-        camera = new THREE.OrthographicCamera(
-          -d * aspect,
-          d * aspect,
-          d,
-          -d,
-          1,
-          10000,
-        );
-        camera.position.set(0, 150, 0);
-        camera.lookAt(0, 0, 0);
-        player = new THREE.Mesh(
-          new THREE.CircleGeometry(0.99 * S, 32),
-          new THREE.MeshBasicMaterial({ color: 0x000000 }),
-        );
-        player.rotation.x = -Math.PI / 2;
-        player.position.y = 0.5;
-        player.visible = false;
-        scene.add(player);
-        renderer = new THREE.WebGLRenderer({ antialias: true });
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.setPixelRatio(window.devicePixelRatio);
-        document.body.appendChild(renderer.domElement);
-        window.addEventListener('resize', onWindowResize);
-        window.addEventListener('keydown', onKeyDown);
-        window.addEventListener('keyup', onKeyUp);
-        window.addEventListener('mousedown', onMouseDown);
-        window.addEventListener('mousemove', onMouseMove);
-        window.addEventListener('mouseup', onMouseUp);
-        renderer.domElement.addEventListener('click', () => unlockAudio(), {
-          once: true,
-        });
-        // 일반 모드: 돌 클릭 → 10 screen px 이동
-        renderer.domElement.addEventListener('click', (e) => {
-          if (isAdminMode || !stoneMesh || !isLoaded) return;
-          mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
-          mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
-          raycaster.setFromCamera(mouse, camera);
-          const targets = [stoneMesh, stone2Mesh].filter(Boolean);
-          const hits = raycaster.intersectObjects(targets);
-          if (hits.length > 0) {
-            const hit = hits[0].object;
-            const ppu = (window.innerHeight / 100) * camera.zoom;
-            const mv = 10 / ppu;
-            const hp = hits[0].point;
-            const dx = hp.x - hit.position.x;
-            const dz = hp.z - hit.position.z;
-            const d = Math.hypot(dx, dz) || 1;
-            hit.position.x += (dx / d) * mv;
-            hit.position.z += (dz / d) * mv;
-            const key = hit.userData.stoneKey || '__stone__';
-            savedPositions[key] = [hit.position.x, hit.position.z];
-            localStorage.setItem(
-              'archive_fixed_pos',
-              JSON.stringify(savedPositions),
-            );
-          }
-        });
-        renderer.domElement.addEventListener('dblclick', (e) => {
-          if (!comboKeys.k || !onepieceMesh) return;
-          mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
-          mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
-          raycaster.setFromCamera(mouse, camera);
-          if (raycaster.intersectObject(onepieceMesh).length > 0)
-            downloadArchive();
-        });
-        renderer.domElement.addEventListener('click', (e) => {
-          if (activeNodes !== mapWorldNodes || !soundTextMesh || isAdminMode)
-            return;
-          mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
-          mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
-          raycaster.setFromCamera(mouse, camera);
-          if (raycaster.intersectObject(soundTextMesh).length > 0)
-            playNextTrack();
-        });
-        fetchData();
-        animate();
-      }
-
-      function onKeyDown(e) {
-        unlockAudio();
-        if (e.key in moveKeys) {
-          moveKeys[e.key] = true;
-          isInteractionPaused = false;
-        }
-        if (e.key.toLowerCase() === 'k') comboKeys.k = true;
-        if (e.key === 'Enter') comboKeys.enter = true;
-        if (e.key === 'Shift') moveKeys.Shift = true;
-        if (comboKeys.k && comboKeys.enter) {
-          isAdminMode = !isAdminMode;
-          document.getElementById('admin-status').style.display = isAdminMode
-            ? 'block'
-            : 'none';
-          if (!isAdminMode) {
-            camera.zoom = 1.0;
-            camera.updateProjectionMatrix();
-            selectedNodes = [];
-            document.getElementById('link-list-panel').style.display = 'none';
-          }
-          comboKeys.k = comboKeys.enter = false;
-        }
-        if (isAdminMode && e.key.toLowerCase() === 'e') {
-          const json = JSON.stringify(savedPositions, null, 2);
-          const blob = new Blob([json], { type: 'application/json' });
-          const a = document.createElement('a');
-          a.href = URL.createObjectURL(blob);
-          a.download = 'archive_positions.json';
-          a.click();
-          navigator.clipboard.writeText(json).catch(() => {});
-        }
-        if (isAdminMode && e.key.toLowerCase() === 'i') {
-          const input = document.createElement('input');
-          input.type = 'file';
-          input.accept = '.json,application/json';
-          input.onchange = (ev) => {
-            const file = ev.target.files[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = (re) => {
-              try {
-                const imported = JSON.parse(re.result);
-                savedPositions = { ...savedPositions, ...imported };
-                localStorage.setItem(
-                  'archive_fixed_pos',
-                  JSON.stringify(savedPositions),
-                );
-                activeNodes.forEach((n) => {
-                  const key = n.userData.isPortal
-                    ? `portal:${n.userData.dest}`
-                    : n.userData.url;
-                  if (savedPositions[key]) {
-                    n.position.x = savedPositions[key][0];
-                    n.position.z = savedPositions[key][1];
-                  }
-                });
-                alert('✓ 위치를 불러왔습니다.');
-              } catch (err) {
-                alert('JSON 파싱 오류: ' + err.message);
-              }
-            };
-            reader.readAsText(file);
-          };
-          input.click();
-        }
-        if (isAdminMode && e.key.toLowerCase() === 'l') {
-          const panel = document.getElementById('link-list-panel');
-          panel.style.display =
-            panel.style.display === 'block' ? 'none' : 'block';
-          if (panel.style.display === 'block') updateLinkListUI();
-        }
-      }
-
-      function onKeyUp(e) {
-        if (e.key in moveKeys) moveKeys[e.key] = false;
-        if (e.key.toLowerCase() === 'k') comboKeys.k = false;
-        if (e.key === 'Enter') comboKeys.enter = false;
-        if (e.key === 'Shift') moveKeys.Shift = false;
-      }
-
-      function updateSelectionVisuals() {
-        activeNodes.forEach((n) => {
-          if (n.userData.domElement && !n.userData.isPortal) {
-            n.userData.domElement.classList.toggle(
-              'selected',
-              selectedNodes.includes(n),
-            );
-          }
-        });
-      }
-
-      function onMouseDown(e) {
-        if (!isAdminMode) return;
-        mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
-        mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
-        raycaster.setFromCamera(mouse, camera);
-        const intersects = raycaster.intersectObjects(activeNodes);
-        const hit = intersects.length > 0 ? intersects[0].object : null;
-        if (e.shiftKey) {
-          if (hit) {
-            const idx = selectedNodes.indexOf(hit);
-            if (idx === -1) selectedNodes.push(hit);
-            else selectedNodes.splice(idx, 1);
-            updateSelectionVisuals();
-          } else {
-            isSelecting = true;
-            selectionStart.set(e.clientX, e.clientY);
-            const rect = document.getElementById('selection-rect');
-            rect.style.display = 'block';
-            rect.style.left = e.clientX + 'px';
-            rect.style.top = e.clientY + 'px';
-            rect.style.width = '0px';
-            rect.style.height = '0px';
-          }
-          return;
-        }
-        if (hit) {
-          draggedNode = hit;
-          if (!selectedNodes.includes(draggedNode)) {
-            selectedNodes = [draggedNode];
-            updateSelectionVisuals();
-          }
-          const vector = new THREE.Vector3(mouse.x, mouse.y, 0.5).unproject(
-            camera,
-          );
-          dragStartWorld.copy(vector);
-          selectedNodes.forEach(
-            (n) => (n.userData.startPos = n.position.clone()),
-          );
-        } else {
-          selectedNodes = [];
-          updateSelectionVisuals();
-        }
-      }
-
-      function onMouseMove(e) {
-        mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
-        mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
-        if (isAdminMode) {
-          if (isSelecting) {
-            const rect = document.getElementById('selection-rect');
-            rect.style.left = Math.min(selectionStart.x, e.clientX) + 'px';
-            rect.style.top = Math.min(selectionStart.y, e.clientY) + 'px';
-            rect.style.width = Math.abs(selectionStart.x - e.clientX) + 'px';
-            rect.style.height = Math.abs(selectionStart.y - e.clientY) + 'px';
-            return;
-          }
-          if (draggedNode) {
-            raycaster.setFromCamera(mouse, camera);
-            const vector = new THREE.Vector3(mouse.x, mouse.y, 0.5).unproject(
-              camera,
-            );
-            const delta = vector.clone().sub(dragStartWorld);
-            selectedNodes.forEach((n) => {
-              n.position.x = n.userData.startPos.x + delta.x;
-              n.position.z = n.userData.startPos.z + delta.z;
-            });
-          }
-          const m = 50;
-          mouseEdge.left = e.clientX < m;
-          mouseEdge.right = e.clientX > window.innerWidth - m;
-          mouseEdge.up = e.clientY < m;
-          mouseEdge.down = e.clientY > window.innerHeight - m;
-        }
-      }
-
-      function onMouseUp() {
-        if (!isAdminMode) return;
-        if (isSelecting) {
-          isSelecting = false;
-          const rect = document.getElementById('selection-rect');
-          const r = rect.getBoundingClientRect();
-          rect.style.display = 'none';
-          activeNodes.forEach((n) => {
-            if (n.userData.isPortal) return;
-            const p = n.position.clone().project(camera);
-            const x = ((p.x + 1) * window.innerWidth) / 2,
-              y = ((-p.y + 1) * window.innerHeight) / 2;
-            if (
-              x >= r.left &&
-              x <= r.right &&
-              y >= r.top &&
-              y <= r.bottom &&
-              !selectedNodes.includes(n)
-            )
-              selectedNodes.push(n);
-          });
-          updateSelectionVisuals();
-          return;
-        }
-        if (selectedNodes.length > 0) {
-          selectedNodes.forEach((n) => {
-            const key = n.userData.isPortal
-              ? `portal:${n.userData.dest}`
-              : n.userData.url;
-            savedPositions[key] = [
-              Math.round(n.position.x),
-              Math.round(n.position.z),
-            ];
-          });
-          localStorage.setItem(
-            'archive_fixed_pos',
-            JSON.stringify(savedPositions),
-          );
-        }
-        draggedNode = null;
-      }
-
-      function updateLinkListUI() {
-        const container = document.getElementById('link-items-container');
-        container.innerHTML = '';
-        const sorted = activeNodes
-          .filter((n) => !n.userData.isPortal)
-          .sort((a, b) => a.userData.title.localeCompare(b.userData.title));
-        document.getElementById('node-count').textContent =
-          `(${sorted.length})`;
-        sorted.forEach((n, i) => {
-          const item = document.createElement('div');
-          item.className = 'link-item';
-          item.innerHTML = `<div class="link-item-header"><span>${i + 1}.</span> ${n.userData.title}</div><div class="link-item-url">${n.userData.url}</div>`;
-          item.onclick = () => {
-            player.position.set(n.position.x, 0.5, n.position.z);
-            camera.position.set(n.position.x, 150, n.position.z);
-          };
-          container.appendChild(item);
-        });
-      }
-
-      function onWindowResize() {
-        const aspect = window.innerWidth / window.innerHeight,
-          d = 50;
-        camera.left = -d * aspect;
-        camera.right = d * aspect;
-        camera.top = d;
-        camera.bottom = -d;
-        camera.updateProjectionMatrix();
-        renderer.setSize(window.innerWidth, window.innerHeight);
-      }
-
-      function toSentenceCase(str) {
-        if (!str) return '';
-        const s = str.toLowerCase();
-        return s.charAt(0).toUpperCase() + s.slice(1);
-      }
-
-      async function fetchData() {
-        try {
-          const URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${GID}&t=${Date.now()}`;
-          const res = await fetch(URL, {
-            cache: 'no-store',
-            headers: { pragma: 'no-cache', 'cache-control': 'no-cache' },
-          });
-          const csv = await res.text();
-          let rows = parseCSV(csv);
-          rows = rows.filter(
-            (r) => r.length > 1 || (r[0] && r[0].trim() !== ''),
-          );
-          rows.shift();
-
-          const total = rows.length;
-          const fillEl = document.getElementById('digging-fill');
-          const overlayEl = document.getElementById('intro-overlay');
-          const layerEl = document.getElementById('labels-layer');
-          let chamberUsageMain = new Array(rawMainChambers.length).fill(1);
-          let chamberUsageMap = new Array(rawMapChambers.length).fill(1);
-          let categoryCounts = {};
-
-          for (let i = 0; i < total; i++) {
-            const c = rows[i];
-            const rawUrl = (c[0] || '').trim();
-            if (!rawUrl) continue;
-            const url = rawUrl.startsWith('http')
-              ? rawUrl
-              : 'https://' + rawUrl;
-            const title = url
-              .replace(/^(https?:\/\/)?(www\.)?/, '')
-              .split(/[/?#:]/)[0];
-            const rawCat = (c[1] || '').trim().toLowerCase();
-            const isMap = /\bsound\b/.test(rawCat) && !/aporee/i.test(url);
-            const meta = (c[2] || '').replace(/"/g, '').trim();
-            const sum = (c[3] || '').replace(/"/g, '').trim();
-
-            const el = document.createElement('div');
-            el.className = 'node-label';
-            el.innerHTML =
-              `<div class="node-meta">${toSentenceCase(meta)}</div>` +
-              `<div class="node-title">${title}</div>` +
-              `<div class="node-cat">${toSentenceCase(rawCat)}</div>` +
-              `<div class="node-sum">${toSentenceCase(sum)}</div>`;
-            layerEl.appendChild(el);
-            const rect = el.getBoundingClientRect();
-            const w_world = rect.width / 10;
-            const h_world = rect.height / 10;
-
-            let x,
-              z,
-              placed = false;
-            if (savedPositions[url]) {
-              x = savedPositions[url][0];
-              z = savedPositions[url][1];
-              placed = true;
-            } else {
-              const sr = mulberry32(getSeedFromStr(url));
-              let tx = 0,
-                tz = 0,
-                bd = 0;
-              if (!isMap) {
-                let dx = 0,
-                  dz = 0;
-                const count = [
-                  /\bsubculture\b/.test(rawCat),
-                  /\boutdoor\b/.test(rawCat),
-                ].filter(Boolean).length;
-                if (count > 0) {
-                  if (/\bsubculture\b/.test(rawCat)) dx += 1;
-                  if (/\boutdoor\b/.test(rawCat)) dz += 1;
-                  const len = Math.hypot(dx, dz) || 1;
-                  dx /= len;
-                  dz /= len;
-                  bd = count === 1 ? 600 : 250;
-                  tx = dx * bd;
-                  tz = dz * bd;
-                } else {
-                  bd = 50;
-                }
-              }
-              const key = isMap ? 'map' : `${Math.round(tx)}_${Math.round(tz)}`;
-              if (!categoryCounts[key]) categoryCounts[key] = 1;
-              const chambers = isMap ? rawMapChambers : rawMainChambers;
-              const tunnels = isMap ? rawMapTunnels : rawMainTunnels;
-              const nodes = isMap ? mapWorldNodes : mainWorldNodes;
-              const sdfThresholds = [16, 8, 2, -10, -30];
-              outer: for (const sdfMin of sdfThresholds) {
-                const maxAtt = sdfMin > 0 ? 1000 : 500;
-                for (let t = 0; t < maxAtt; t++) {
-                  const n = categoryCounts[key];
-                  const ang = n * 2.39996 + sr() * 0.5;
-                  const lr = (isMap ? 55 : 40) * Math.sqrt(n);
-                  x = tx + Math.cos(ang) * lr;
-                  z = tz + Math.sin(ang) * lr;
-                  if (colonySDF(x, z, chambers, tunnels) > sdfMin) {
-                    let overlap = false;
-                    for (const nd of nodes) {
-                      if (
-                        Math.abs(x - nd.position.x) <
-                          (w_world + nd.userData.w_world) / 2 + 2 &&
-                        Math.abs(z - nd.position.z) <
-                          (h_world + nd.userData.h_world) / 2 + 2
-                      ) {
-                        overlap = true;
-                        break;
-                      }
-                    }
-                    if (!overlap) {
-                      categoryCounts[key]++;
-                      placed = true;
-                      break outer;
-                    }
-                  }
-                  categoryCounts[key]++;
-                }
-              }
-              if (!placed) {
-                x = tx + (sr() - 0.5) * 75;
-                z = tz + (sr() - 0.5) * 75;
-                placed = true;
-              }
-            }
-
-            if (placed) {
-              const geo = new THREE.PlaneGeometry(w_world, h_world);
-              const mat = new THREE.MeshBasicMaterial({
-                transparent: true,
-                opacity: 0,
-              });
-              const b = new THREE.Mesh(geo, mat);
-              b.position.set(x, 0.2, z);
-              b.rotation.x = -Math.PI / 2;
-              b.userData = {
-                url,
-                title,
-                meta,
-                cat: rawCat,
-                sum,
-                targetScale: 1,
-                currentScale: 1,
-                targetOpacity: 1,
-                currentOpacity: 1,
-                isPortal: false,
-                domElement: el,
-                w_world,
-                h_world,
-              };
-              if (isMap) {
-                b.visible = false;
-                el.style.display = 'none';
-              }
-              scene.add(b);
-              (isMap ? mapWorldNodes : mainWorldNodes).push(b);
-              const usage = isMap ? chamberUsageMap : chamberUsageMain;
-              const chams = isMap ? rawMapChambers : rawMainChambers;
-              chams.forEach((ch, idx) => {
-                if (Math.hypot(x - ch[0], z - ch[1]) < ch[2] + 40) usage[idx]++;
-              });
-            }
-
-            fillEl.style.width = (i / total) * 100 + '%';
-            if (i % 10 === 0) await new Promise((res) => setTimeout(res, 1));
-          }
-
-          finalizeWorld(chamberUsageMain, chamberUsageMap);
-          createPortals();
-          setTimeout(() => {
-            overlayEl.style.opacity = '0';
-            overlayEl.style.visibility = 'hidden';
-            layerEl.style.opacity = '1';
-            isLoaded = true;
-          }, 800);
-        } catch (e) {
-          console.error(e);
-        }
-      }
-
-      function finalizeWorld(um, umap) {
-        um[0] = um[5] = 1;
-        umap[0] = 1;
-        const build = (idx, rc, rt) => {
-          const c = idx.map((i) => rc[i]),
-            m = {};
-          idx.forEach((o, n) => (m[o] = n));
-          const t = rt
-            .filter(([a, b]) => idx.includes(a) && idx.includes(b))
-            .map(([a, b, hw]) => [m[a], m[b], hw]);
-          return { c, t };
-        };
-        const midx = um.map((u, i) => (u > 0 ? i : -1)).filter((i) => i !== -1);
-        const mapidx = umap
-          .map((u, i) => (u > 0 ? i : -1))
-          .filter((i) => i !== -1);
-        _mainConfig = build(midx, rawMainChambers, rawMainTunnels);
-        _mapConfig = build(mapidx, rawMapChambers, rawMapTunnels);
-        _activeChambers = _mainConfig.c;
-        _activeTunnels = _mainConfig.t;
-        mainFloorGroup = buildFloorGroup(_mainConfig.c, _mainConfig.t);
-        scene.add(mainFloorGroup);
-        mapFloorGroup = buildEllipseFloorGroup(MAP_RX, MAP_RZ);
-        mapFloorGroup.visible = false;
-        scene.add(mapFloorGroup);
-        createOnepieceBlock();
-        createStone();
-        createStone2();
-      }
-
-      // ── 돌 장애물 ──────────────────────────────────────────────
-      function createStone() {
-        const SEG = 10;
-        const pos = [],
-          idx = [];
-        pos.push(0, 0.15, 0);
-        for (let i = 0; i < SEG; i++) {
-          const ang = (i / SEG) * Math.PI * 2;
-          const pr =
-            STONE_RADIUS *
-            (1.0 +
-              0.2 * Math.sin(ang * 2 + 1.1) +
-              0.13 * Math.sin(ang * 3 + 2.6));
-          pos.push(Math.cos(ang) * pr, 0.15, Math.sin(ang) * pr);
-        }
-        for (let i = 0; i < SEG; i++) idx.push(0, i + 1, ((i + 1) % SEG) + 1);
-        const geo = new THREE.BufferGeometry();
-        geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-        geo.setIndex(idx);
-        stoneMesh = new THREE.Mesh(
-          geo,
-          new THREE.MeshBasicMaterial({
-            color: 0x444444,
-            side: THREE.DoubleSide,
-          }),
-        );
-        const saved = savedPositions['__stone__'];
-        stoneMesh.position.x = saved ? saved[0] : rawMainChambers[0][0] + 20;
-        stoneMesh.position.z = saved ? saved[1] : rawMainChambers[0][1] + 20;
-        stoneMesh.userData = {
-          isPortal: false,
-          isStone: true,
-          stoneKey: '__stone__',
-          url: '__stone__',
-          title: 'Stone',
-          targetScale: 1,
-          currentScale: 1,
-          targetOpacity: 1,
-          currentOpacity: 1,
-          w_world: STONE_RADIUS * 2,
-          h_world: STONE_RADIUS * 2,
-          domElement: null,
-          stoneRadius: STONE_RADIUS,
-        };
-        scene.add(stoneMesh);
-        mainWorldNodes.push(stoneMesh);
-      }
-
-      function createStone2() {
-        // 살짝 각지고 불규칙한 타원형 (rx:rz ≈ 1.6:1)
-        const SEG = 16;
-        const RX = STONE2_RADIUS * 1.6; // 가로 반지름 (넓적한 타원)
-        const RZ = STONE2_RADIUS * 1.0; // 세로 반지름
-        const pos = [],
-          idx = [];
-        pos.push(0, 0.15, 0);
-        for (let i = 0; i < SEG; i++) {
-          const ang = (i / SEG) * Math.PI * 2;
-          // 타원 기반 + 아주 작은 불규칙 요동
-          const baseX = Math.cos(ang) * RX;
-          const baseZ = Math.sin(ang) * RZ;
-          const nudge =
-            1.0 +
-            0.06 * Math.sin(ang * 2 + 0.8) + // 완만한 요동
-            0.04 * Math.sin(ang * 4 + 2.1); // 약간의 각짐
-          pos.push(baseX * nudge, 0.15, baseZ * nudge);
-        }
-        for (let i = 0; i < SEG; i++) idx.push(0, i + 1, ((i + 1) % SEG) + 1);
-        const geo = new THREE.BufferGeometry();
-        geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-        geo.setIndex(idx);
-        stone2Mesh = new THREE.Mesh(
-          geo,
-          new THREE.MeshBasicMaterial({
-            color: 0x555555,
-            side: THREE.DoubleSide,
-          }),
-        );
-        const saved = savedPositions['__stone2__'];
-        stone2Mesh.position.x = saved ? saved[0] : rawMainChambers[0][0] + 35;
-        stone2Mesh.position.z = saved ? saved[1] : rawMainChambers[0][1] + 10;
-        stone2Mesh.userData = {
-          isPortal: false,
-          isStone: true,
-          stoneKey: '__stone2__',
-          url: '__stone2__',
-          title: 'Stone2',
-          targetScale: 1,
-          currentScale: 1,
-          targetOpacity: 1,
-          currentOpacity: 1,
-          w_world: STONE2_RADIUS * 2,
-          h_world: STONE2_RADIUS * 2,
-          domElement: null,
-          stoneRadius: STONE2_RADIUS,
-        };
-        scene.add(stone2Mesh);
-        mainWorldNodes.push(stone2Mesh);
-      }
-
-      // ── Onepiece 블록 ──────────────────────────────────────────
-      function createOnepieceBlock() {
-        // 2× 크기: 11×7 world units
-        const BW = 11,
-          BH = 7;
-        // Three.js mesh: 투명 (raycasting 전용)
-        const geo = new THREE.PlaneGeometry(BW, BH);
-        const mat = new THREE.MeshBasicMaterial({
-          transparent: true,
-          opacity: 0,
-        });
-        onepieceMesh = new THREE.Mesh(geo, mat);
-        onepieceMesh.rotation.x = -Math.PI / 2;
-        onepieceMesh.position.y = 0.3;
-
-        const saved = savedPositions['__onepiece__'];
-        onepieceMesh.position.x = saved ? saved[0] : rawMainChambers[0][0] + 15;
-        onepieceMesh.position.z = saved ? saved[1] : rawMainChambers[0][1] + 15;
-
-        // DOM 요소: 시각적 표현
-        const el = document.createElement('div');
-        el.className = 'onepiece-block';
-        el.textContent = 'Onepiece';
-        document.getElementById('labels-layer').appendChild(el);
-
-        onepieceMesh.userData = {
-          isPortal: false,
-          isOnepiece: true,
-          url: '__onepiece__',
-          title: 'Onepiece',
-          targetScale: 1,
-          currentScale: 1,
-          targetOpacity: 1,
-          currentOpacity: 1,
-          w_world: BW,
-          h_world: BH,
-          domElement: el,
-        };
-        scene.add(onepieceMesh);
-        mainWorldNodes.push(onepieceMesh);
-      }
-
-      // ── 전체 링크+메타데이터 텍스트 다운로드 ──────────────────
-      function downloadArchive() {
-        const allNodes = [...mainWorldNodes, ...mapWorldNodes].filter(
-          (n) => !n.userData.isPortal && !n.userData.isOnepiece,
-        );
-        allNodes.sort((a, b) =>
-          (a.userData.title || '').localeCompare(b.userData.title || ''),
-        );
-
-        const lines = ['ARCHIVE — All Links & Metadata', '='.repeat(52), ''];
-        allNodes.forEach((n, i) => {
-          const u = n.userData;
-          lines.push(`${i + 1}. ${u.title}`);
-          lines.push(`   URL      : ${u.url}`);
-          if (u.meta) lines.push(`   Meta     : ${u.meta}`);
-          if (u.cat) lines.push(`   Category : ${u.cat}`);
-          if (u.sum) lines.push(`   Summary  : ${u.sum}`);
-          lines.push('');
-        });
-
-        const blob = new Blob([lines.join('\n')], {
-          type: 'text/plain; charset=utf-8',
-        });
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = 'archive.txt';
-        a.click();
-      }
-
-      function createPortals() {
-        const makePortal = (savedKey, defaultPos, dest, hidden) => {
-          const saved = savedPositions[savedKey];
-          const mesh = new THREE.Mesh(
-            new THREE.CircleGeometry(15 * S, 32),
-            new THREE.MeshBasicMaterial({ opacity: 0, transparent: true }),
-          );
-          mesh.rotation.x = -Math.PI / 2;
-          mesh.position.set(
-            saved ? saved[0] : defaultPos[0],
-            0.1,
-            saved ? saved[1] : defaultPos[1],
-          );
-          const el = document.createElement('div');
-          el.className = 'portal-node';
-          document.getElementById('labels-layer').appendChild(el);
-          mesh.userData = {
-            isPortal: true,
-            dest,
-            targetScale: 1.0,
-            currentScale: 1.0,
-            targetOpacity: 0.5,
-            currentOpacity: 0.5,
-            domElement: el,
-          };
-          if (hidden) {
-            mesh.visible = false;
-            el.style.display = 'none';
-          }
-          scene.add(mesh);
-          return mesh;
-        };
-        const p1 = makePortal(
-          'portal:map',
-          [rawMainChambers[5][0], rawMainChambers[5][1]],
-          'map',
-          false,
-        );
-        mainPortalMesh = p1;
-        mainWorldNodes.push(p1);
-        const p2 = makePortal('portal:main', [0, MAP_RZ * 0.72], 'main', true);
-        mapWorldNodes.push(p2);
-      }
-
-      function drawProgress(r) {
-        const ring = document.querySelector('#progress-ring circle');
-        ring.style.strokeDashoffset = 283 * (1 - r);
-        document.getElementById('progress-ring').style.opacity =
-          r > 0 ? '1' : '0';
-      }
-
-      function drawMinimap() {
-        const ms = 200,
-          co = ms / 2;
-        const sc = ms / (activeNodes === mapWorldNodes ? 1400 : 3000);
-        minimapCtx.clearRect(0, 0, ms, ms);
-        minimapCtx.save();
-        minimapCtx.translate(co, co);
-        minimapCtx.scale(sc, sc);
-        minimapCtx.translate(-player.position.x, -player.position.z);
-        minimapCtx.fillStyle = '#ffffff';
-        minimapCtx.strokeStyle = '#ffffff';
-        for (const [a, b, hw] of _activeTunnels) {
-          if (!_activeChambers[a] || !_activeChambers[b]) continue;
-          minimapCtx.lineWidth = hw * 2;
-          minimapCtx.lineCap = 'round';
-          minimapCtx.beginPath();
-          minimapCtx.moveTo(_activeChambers[a][0], _activeChambers[a][1]);
-          minimapCtx.lineTo(_activeChambers[b][0], _activeChambers[b][1]);
-          minimapCtx.stroke();
-        }
-        for (const [cx, cz, r] of _activeChambers) {
-          minimapCtx.beginPath();
-          minimapCtx.arc(cx, cz, r, 0, Math.PI * 2);
-          minimapCtx.fill();
-        }
-        activeNodes.forEach((n) => {
-          if (n.userData.isPortal) {
-            minimapCtx.fillStyle = '#000000';
-            minimapCtx.fillRect(n.position.x - 15, n.position.z - 15, 30, 30);
-          } else {
-            minimapCtx.fillStyle = selectedNodes.includes(n)
-              ? '#ff0000'
-              : '#000000';
-            minimapCtx.fillRect(n.position.x - 5, n.position.z - 5, 10, 10);
-          }
-        });
-        // 돌 표시
-        if (activeNodes === mainWorldNodes) {
-          minimapCtx.save();
-          minimapCtx.translate(co, co);
-          minimapCtx.scale(sc, sc);
-          minimapCtx.translate(-player.position.x, -player.position.z);
-          if (stoneMesh) {
-            minimapCtx.fillStyle = '#444444';
-            minimapCtx.beginPath();
-            minimapCtx.arc(
-              stoneMesh.position.x,
-              stoneMesh.position.z,
-              STONE_RADIUS * 3,
-              0,
-              Math.PI * 2,
-            );
-            minimapCtx.fill();
-          }
-          if (stone2Mesh) {
-            minimapCtx.fillStyle = '#555555';
-            minimapCtx.beginPath();
-            minimapCtx.arc(
-              stone2Mesh.position.x,
-              stone2Mesh.position.z,
-              STONE2_RADIUS * 3,
-              0,
-              Math.PI * 2,
-            );
-            minimapCtx.fill();
-          }
-          minimapCtx.restore();
-        }
-        minimapCtx.restore();
-        minimapCtx.fillStyle = '#ff0000';
-        minimapCtx.beginPath();
-        minimapCtx.arc(co, co, 4, 0, Math.PI * 2);
-        minimapCtx.fill();
-      }
-
-      function switchWorld(dest) {
-        activeNodes.forEach((n) => {
-          n.visible = false;
-          if (n.userData.domElement)
-            n.userData.domElement.style.display = 'none';
-        });
-        if (dest === 'map') {
-          playRandomTrack();
-          activeNodes = mapWorldNodes;
-          mainFloorGroup.visible = false;
-          mapFloorGroup.visible = true;
-          _activeChambers = _mapConfig.c;
-          _activeTunnels = _mapConfig.t;
-        } else {
-          stopAudio();
-          activeNodes = mainWorldNodes;
-          mainFloorGroup.visible = true;
-          mapFloorGroup.visible = false;
-          _activeChambers = _mainConfig.c;
-          _activeTunnels = _mainConfig.t;
-        }
-        activeNodes.forEach((n) => {
-          n.visible = true;
-        });
-        isInteractionPaused = false; // 월드 전환 후 인터랙션 재활성화
-        const spawnX =
-          dest === 'main' && mainPortalMesh ? mainPortalMesh.position.x : 0;
-        const spawnZ =
-          dest === 'main' && mainPortalMesh ? mainPortalMesh.position.z : 0;
-        player.position.set(spawnX, 0.5, spawnZ);
-        camera.position.set(spawnX, 150, spawnZ);
-        if (
-          document.getElementById('link-list-panel').style.display === 'block'
-        )
-          updateLinkListUI();
-      }
+      const floorGeo = new THREE.PlaneGeometry(15, 15);
+      const floorMat = new THREE.ShadowMaterial({ opacity: 0.12 });
+      const floor = new THREE.Mesh(floorGeo, floorMat);
+      floor.rotation.x = -Math.PI / 2;
+      floor.position.y = -1.8;
+      floor.receiveShadow = true;
+      scene.add(floor);
 
       function animate() {
         requestAnimationFrame(animate);
-        if (!isLoaded) return;
-        const s = 1.25;
-        let nx = player.position.x,
-          nz = player.position.z,
-          moved = false;
-        if (moveKeys.ArrowUp) {
-          nz -= s;
-          moved = true;
-        }
-        if (moveKeys.ArrowDown) {
-          nz += s;
-          moved = true;
-        }
-        if (moveKeys.ArrowLeft) {
-          nx -= s;
-          moved = true;
-        }
-        if (moveKeys.ArrowRight) {
-          nx += s;
-          moved = true;
-        }
-        if (isAdminMode) {
-          if (mouseEdge.up) {
-            nz -= s;
-            moved = true;
-          }
-          if (mouseEdge.down) {
-            nz += s;
-            moved = true;
-          }
-          if (mouseEdge.left) {
-            nx -= s;
-            moved = true;
-          }
-          if (mouseEdge.right) {
-            nx += s;
-            moved = true;
-          }
-          if (moveKeys['<']) {
-            camera.zoom = Math.max(0.05, camera.zoom - 0.02);
-            camera.updateProjectionMatrix();
-          }
-          if (moveKeys['>']) {
-            camera.zoom = Math.min(5.0, camera.zoom + 0.02);
-            camera.updateProjectionMatrix();
-          }
-        }
-        if (moved) {
-          if (isPlayerInside(nx, nz)) {
-            player.position.x = nx;
-            player.position.z = nz;
-          } else if (isPlayerInside(nx, player.position.z)) {
-            player.position.x = nx;
-          } else if (isPlayerInside(player.position.x, nz)) {
-            player.position.z = nz;
-          }
-        }
-        camera.position.set(player.position.x, 150, player.position.z);
-        if (!isAdminMode) updateInteraction();
-
-        const ppu = (window.innerHeight / 100) * camera.zoom;
-        const scaleBase = ppu / 10;
-        const pd = document.getElementById('player-dot');
-        pd.style.width = pd.style.height = 0.99 * 3 * ppu + 'px';
-        const pr = document.getElementById('progress-ring');
-        pr.style.width = pr.style.height = 1.98 * ppu + 'px';
-
-        activeNodes.forEach((n) => {
-          const u = n.userData;
-          if (
-            Math.abs(u.targetScale - u.currentScale) > 0.001 ||
-            Math.abs(u.targetOpacity - u.currentOpacity) > 0.001
-          ) {
-            u.currentScale += (u.targetScale - u.currentScale) * 0.15;
-            u.currentOpacity += (u.targetOpacity - u.currentOpacity) * 0.15;
-            if (u.isPortal) n.scale.set(u.currentScale, u.currentScale, 1);
-          }
-          if (u.domElement) {
-            if (n.visible) {
-              u.domElement.style.display = u.isPortal ? 'block' : 'flex';
-              const pos = n.position.clone().project(camera);
-              const sx = (pos.x * 0.5 + 0.5) * window.innerWidth;
-              const sy = (-pos.y * 0.5 + 0.5) * window.innerHeight;
-              if (u.isPortal) {
-                const size = 15 * ppu * u.currentScale;
-                u.domElement.style.width = u.domElement.style.height =
-                  size + 'px';
-                u.domElement.style.transform = `translate3d(${sx}px,${sy}px,0) translate(-50%,-50%)`;
-                u.domElement.style.opacity = u.currentOpacity;
-                const ir = u.interactRatio || 0;
-                const br = Math.round(ir * 255);
-                u.domElement.style.background = `rgb(${br},${br},${br})`;
-                u.domElement.style.boxShadow =
-                  ir > 0.05
-                    ? `0 0 ${ir * 80}px ${ir * 40}px rgba(255,255,255,${ir * 0.9})`
-                    : '';
-              } else if (u.isOnepiece) {
-                // Onepiece: ppu 기반 직접 크기 계산 + 빠른 RGB 사이클
-                const ow = u.w_world * ppu * u.currentScale;
-                const oh = u.h_world * ppu * u.currentScale;
-                u.domElement.style.width = ow + 'px';
-                u.domElement.style.height = oh + 'px';
-                u.domElement.style.fontSize = oh * 0.22 + 'px';
-                u.domElement.style.transform = `translate3d(${sx}px,${sy}px,0) translate(-50%,-50%)`;
-                // 빠른 RGB 그라데이션 (opacity 0.3)
-                const t = Date.now() * 0.01;
-                const r = Math.round(Math.sin(t) * 127 + 128);
-                const g = Math.round(Math.sin(t + 2.094) * 127 + 128);
-                const b = Math.round(Math.sin(t + 4.189) * 127 + 128);
-                const col = `rgba(${r},${g},${b},0.3)`;
-                u.domElement.style.color = col;
-                u.domElement.style.borderColor = col;
-              } else {
-                const fs = scaleBase * u.currentScale;
-                u.domElement.style.transform = `translate3d(${sx}px,${sy}px,0) translate(-50%,-50%) scale(${fs})`;
-                u.domElement.style.opacity = u.currentOpacity;
-              }
-            } else {
-              u.domElement.style.display = 'none';
-            }
-          }
-        });
-
-        if (activeNodes === mapWorldNodes && soundTextMesh) {
-          raycaster.setFromCamera(mouse, camera);
-          const hits = raycaster.intersectObject(soundTextMesh);
-          const hovered = hits.length > 0;
-          if (hovered !== isTextHovered) {
-            isTextHovered = hovered;
-            document.body.style.cursor = hovered ? 'pointer' : '';
-          }
-          const targetOp = hovered ? 0.65 : 0.3;
-          const targetSc = hovered ? 1.06 : 1.0;
-          soundTextMesh.material.opacity +=
-            (targetOp - soundTextMesh.material.opacity) * 0.12;
-          soundTextMesh.scale.x += (targetSc - soundTextMesh.scale.x) * 0.12;
-          soundTextMesh.scale.z += (targetSc - soundTextMesh.scale.z) * 0.12;
-        }
-
-        drawMinimap();
+        controls.update();
         renderer.render(scene, camera);
       }
+      animate();
 
-      function updateInteraction() {
-        let target = null;
-        for (const n of activeNodes) {
-          if (n.userData.isStone || n.userData.isOnepiece) continue;
-          if (
-            player.position.distanceTo(n.position) <
-            (n.userData.isPortal ? 21 : 9)
-          ) {
-            target = n;
-            break;
-          }
-        }
-        if (!target || isInteractionPaused) {
-          if (currentTarget) {
-            currentTarget.userData.targetScale = 1.0;
-            currentTarget.userData.targetOpacity = currentTarget.userData
-              .isPortal
-              ? 0.5
-              : 1.0;
-            currentTarget.userData.interactRatio = 0;
-            currentTarget = null;
-          }
-          stayStartTime = null;
-          drawProgress(0);
-          return;
-        }
-        const now = Date.now();
-        if (!stayStartTime) {
-          stayStartTime = now;
-          currentTarget = target;
-        }
-        const ratio = Math.min((now - stayStartTime) / 3000, 1.0);
-        drawProgress(ratio);
-        if (currentTarget) {
-          if (currentTarget.userData.isPortal) {
-            currentTarget.userData.targetOpacity = 0.5 + 0.5 * ratio;
-            currentTarget.userData.targetScale = 1.0 + 3.0 * ratio;
-            currentTarget.userData.interactRatio = ratio;
-          } else {
-            currentTarget.userData.targetScale = 1.1;
-            currentTarget.userData.targetOpacity = 1.0 - 0.5 * ratio;
-          }
-        }
-        if (ratio >= 1.0) {
-          if (currentTarget.userData.isPortal)
-            switchWorld(currentTarget.userData.dest);
-          else window.open(currentTarget.userData.url, '_blank');
-          stayStartTime = null;
-          currentTarget = null;
-          drawProgress(0);
-          isInteractionPaused = true;
-        }
-      }
-
-      init();
+      window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      });
     </script>
   </body>
 </html>
